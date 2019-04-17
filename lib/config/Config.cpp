@@ -28,7 +28,7 @@ Config::Config() {
 			stringParas.insert(make_pair(strParaNames[i], ""));
 		}
 	}
-	intParas.insert(make_pair("primers", 5));
+	intParas.insert(make_pair("primers", 100000));
 	intParas.insert(make_pair("threads", 1));
 	intParas.insert(make_pair("verbose", 1));
 	intParas.insert(make_pair("readLength", 0));
@@ -37,13 +37,14 @@ Config::Config() {
 	intParas.insert(make_pair("isize", 300));
 	intParas.insert(make_pair("kmer", 3));
 	intParas.insert(make_pair("bins", 0));
-	intParas.insert(make_pair("ampliconMaxLen", 1500));
-	intParas.insert(make_pair("ampliconMinLen", 500));
+	intParas.insert(make_pair("ampliconMaxLen", 2000));
+	intParas.insert(make_pair("ampliconMinLen", 1000));
 	intParas.insert(make_pair("fragSize", 1000));
 	
 	realParas.insert(make_pair("indelRate", 0.00025));
+	realParas.insert(make_pair("gamma", 0.9));
 	realParas.insert(make_pair("ador", 0.01));
-	realParas.insert(make_pair("fpr", 0.05));
+	realParas.insert(make_pair("ber", 0.002));
 	/*---end default configuration---*/
 }
 
@@ -67,7 +68,7 @@ void Config::setStringPara(string paraName, string value) {
 	}
 }
 
-int Config::getIntPara(string paraName) {
+long Config::getIntPara(string paraName) {
 	if(intParas.find(paraName) != intParas.end()) {
 		return intParas[paraName];
 	}
@@ -77,7 +78,7 @@ int Config::getIntPara(string paraName) {
 	}
 }
 
-void Config::setIntPara(string paraName, int value) {
+void Config::setIntPara(string paraName, long value) {
 	if(intParas.find(paraName) != intParas.end()) {
 		intParas[paraName] = value;
 	}

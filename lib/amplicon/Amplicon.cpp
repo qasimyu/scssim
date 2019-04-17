@@ -44,7 +44,7 @@ void AmpError::setAlt(unsigned char alt) {
 	data[3] = (data[3] & 0xF8) | (alt & 0x07);
 }
 
-Amplicon::Amplicon(bool isSemi, unsigned long tmplIndx, AmpError *ampErrs, unsigned int startPos, unsigned int length, unsigned int gcContent) {
+Amplicon::Amplicon(bool isSemi, void *tmpl, AmpError *ampErrs, unsigned int startPos, unsigned int length, unsigned int gcContent) {
 //Amplicon::Amplicon(bool isSemi, void *tmpl, AmpError *ampErrs, unsigned int startPos, unsigned int length, unsigned int gcContent) {
 	//assert(tmpl != NULL);
 	
@@ -57,14 +57,16 @@ Amplicon::Amplicon(bool isSemi, unsigned long tmplIndx, AmpError *ampErrs, unsig
 	data[5] = (gcContent >> 4) & 0x000000FF;
 	data[6] = (gcContent & 0x0000000F) << 4;
 	
-	//this->tmpl = tmpl;
-	this->tmplIndx = tmplIndx;
+	this->tmpl = tmpl;
 	this->ampErrs = ampErrs;
+	this->sequence = NULL;
 }
 
 void Amplicon::clear() {
 	delete[] ampErrs;
+	delete[] sequence;
 	ampErrs = NULL;
+	sequence = NULL;
 }
 
 bool Amplicon::isSemi() {
@@ -132,59 +134,93 @@ void Amplicon::setGCcontent(unsigned int gcContent) {
 	data[6] = (data[6] & 0x0F) | ((gcContent & 0x0000000F) << 4);
 }
 
-void Amplicon::amplify(vector<Amplicon>& fullAmplicons, unsigned long tmplIndx) {
+unsigned int Amplicon::getData() {
+	unsigned int sum = 0;
+	int i;
+	for(i = 0; i < 4; i++) {
+		unsigned int tmp = data[i];
+		tmp = tmp << i*8; 
+		sum += tmp;
+	}
+	return sum;
+}
+void Amplicon::setData(unsigned int n) {
+	unsigned int tmp = 0x000000FF;
+	int i;
+	for(i = 0; i < 4; i++) {
+		data[i] = (n & tmp) >> i*8;
+		tmp = tmp << 8;
+	}
+}
+
+void Amplicon::amplify(AmpliconLink& results, AmpliconLink source) {
 	unsigned int i, j, k, n;
 	unsigned int spos, ampliconLen;
 	double ador = config.getRealPara("ador");
-	double fpr = config.getRealPara("fpr");
-	char* semiAmpSeq = getSequence();
+	double ber = config.getRealPara("ber");
 	string bases = config.getStringPara("bases");
 	unsigned int length = getLength();
 	unsigned short int primerNum = getPrimers();
 	int maxLen = config.getIntPara("ampliconMaxLen");
 	int minLen = config.getIntPara("ampliconMinLen");
+	
+	if(length < minLen+27) {
+		return;
+	}
+	
+	char* semiAmpSeq = getSequence();
+	char* semiAmpSeq_c = getComplementSeq(semiAmpSeq);
+	//char* semiAmpSeq_c = semiAmpSeq;
 	short int* posAttached = new short int[length];
 	memset(posAttached, 0, length*sizeof(unsigned short int));
 	
 	for(i = 0; i < primerNum; i++) {
 		int tryTimes = 0;
-		spos = 0;
 		do {
-			//spos = randomInteger(0, length-34);
+			spos = threadPool->randomInteger(27, length);
 			ampliconLen = threadPool->randomDouble(minLen, maxLen+1);
 			tryTimes++;
 			if(tryTimes > 50) {
 				break;
 			}
-		} while(spos+ampliconLen > length || posAttached[spos+ampliconLen-1] == 1);
+			if(spos+ampliconLen > length || posAttached[spos] == 1) {
+				continue;
+			}
+			char c = semiAmpSeq_c[spos+8];
+			semiAmpSeq_c[spos+8] = '\0';
+			j = malbac.updatePrimerCount(&semiAmpSeq_c[spos], -1);
+			semiAmpSeq_c[spos+8] = c;
+			if(j == 1) {
+				break;
+			}
+		} while(1);
 		if(tryTimes > 50) {
 			break;
 		}
 		
-		posAttached[spos+ampliconLen-1] = 1;
+		posAttached[spos] = 1;
 		
-		char c = semiAmpSeq[spos+ampliconLen];
-		semiAmpSeq[spos+ampliconLen] = '\0';
-		unsigned int gcNum = countGC(semiAmpSeq+spos);
-		semiAmpSeq[spos+ampliconLen] = c;
+		char c = semiAmpSeq_c[spos+ampliconLen];
+		semiAmpSeq_c[spos+ampliconLen] = '\0';
+		int gcNum = countGC(semiAmpSeq_c+spos);
+		semiAmpSeq_c[spos+ampliconLen] = c;
 		
 		vector<AmpError> errs;
 		k = 0;
-		for(j = 0; j < ampliconLen-8; j++) {
+		for(j = 8; j < ampliconLen; j++) {
 			double p = threadPool->randomDouble(0, 1);
 			if(p <= ador) {
-				//AmpError ampErr(ADO, j, 0);
 				AmpError ampErr(0, j, 0);
 				errs.push_back(ampErr);
 				k++;
-				if(semiAmpSeq[spos+j] == 'C' || semiAmpSeq[spos+j] == 'G') {
+				if(semiAmpSeq_c[spos+j] == 'C' || semiAmpSeq_c[spos+j] == 'G') {
 					gcNum--;
 				}
 				continue;
 			}
 			p = threadPool->randomDouble(0, 1);
-			if(p <= fpr) {
-				char base = getComplementBase(semiAmpSeq[spos+j]);
+			if(p <= ber) {
+				char base = semiAmpSeq_c[spos+j];
 				do {
 					n = threadPool->randomDouble(0, bases.size());
 				} while(bases[n] == base);
@@ -195,7 +231,6 @@ void Amplicon::amplify(vector<Amplicon>& fullAmplicons, unsigned long tmplIndx) 
 				if(base == 'C' || base == 'G') {
 					gcNum--;
 				}
-				//AmpError ampErr(FP, j, bases[n]);
 				AmpError ampErr(1, j, n);
 				errs.push_back(ampErr);
 			}
@@ -208,44 +243,42 @@ void Amplicon::amplify(vector<Amplicon>& fullAmplicons, unsigned long tmplIndx) 
 			}
 			ampErrs[j].setAlt(bases.size());
 		}
-		//Amplicon tmp(false, this, ampErrs, spos, ampliconLen-k, gcNum);
-		Amplicon tmp(false, tmplIndx, ampErrs, spos, ampliconLen-k, gcNum);
-		fullAmplicons.push_back(tmp);
+		Amplicon tmp(false, source, ampErrs, spos, ampliconLen-k, max(0, gcNum));
+		insertLinkList(results, tmp);
 	}
 	
-	delete[] semiAmpSeq;
+	delete[] semiAmpSeq_c;
 	delete[] posAttached;
 }
 
 void* Amplicon::batchAmplify(const void* args) {
-	unsigned long* indexs = (unsigned long*) args;
-	unsigned long sindx = indexs[0];
-	unsigned long eindx = indexs[1];
-	unsigned long i;
-	vector<Amplicon>& semiAmplicons = malbac.getSemiAmplicons();
-	vector<Amplicon> results;
+	AmpliconLink* pNodeRange = (AmpliconLink*) args;
+	AmpliconLink p = pNodeRange[0];
 	
-	for(i = sindx; i <= eindx; i++) {
-		//semiAmplicons[i].amplify(results);
-		semiAmplicons[i].amplify(results, i);
+	AmpliconLink results = createNullLink();
+	while(p != pNodeRange[1]) {
+		p->amplicon.amplify(results, p);
+		p = p->link;
 	}
 	
 	malbac.extendFullAmplicons(results);
 }
 
 char* Amplicon::getSequence() {
+	if(sequence != NULL) {
+		return sequence;
+	}
 	unsigned int i, j, k;
 	unsigned int n, m, sindx;
 	unsigned int semiLength, length;
 	unsigned int spos;
 	string bases = config.getStringPara("bases");
 	if(!isSemi()) {
-		//Amplicon *ap = static_cast<Amplicon*>(tmpl);
-		Amplicon& semiAmp = malbac.getSemiAmplicon(tmplIndx);
-		//Fragment *fp = (Fragment*) (ap->getTmpl());
-		Fragment& frag = malbac.getFrag(semiAmp.tmplIndx);
+		AmpliconLink p = (AmpliconLink) tmpl;
+		Amplicon& semiAmp = p->amplicon;
+		Fragment* frag = (Fragment*) (semiAmp.tmpl);
 		//frag.describe();
-		char* fragSeq = frag.getSequence();
+		char* fragSeq = frag->getSequence();
 		char* semiSeq_o = new char[strlen(fragSeq)+1];
 		strcpy(semiSeq_o, fragSeq);
 		semiSeq_o = getComplementSeq(semiSeq_o);
@@ -279,8 +312,9 @@ char* Amplicon::getSequence() {
 		}
 		delete[] semiSeq_o;
 		
-		// convert to 5'->3'
+		// convert to 3'->5'
 		reverse(semiSeq, semiSeq+strlen(semiSeq));
+		
 		char* fullSeq = getComplementSeq(semiSeq);
 		
 		length = getLength();
@@ -312,14 +346,11 @@ char* Amplicon::getSequence() {
 		}
 		delete[] fullSeq;
 		
-		reverse(ret, ret+strlen(ret));
 		return ret;
 	}
 	else {
-		//Fragment *fp = (Fragment*) tmpl;
-		Fragment& frag = malbac.getFrag(tmplIndx);
-		char* fragSeq = frag.getSequence();
-		//char* semiSeq_o = getComplementSeq(fragSeq);
+		Fragment *frag = (Fragment*) tmpl;
+		char* fragSeq = frag->getSequence();
 		char* semiSeq_o = new char[strlen(fragSeq)+1];
 		strcpy(semiSeq_o, fragSeq);
 		semiSeq_o = getComplementSeq(semiSeq_o);
@@ -352,78 +383,39 @@ char* Amplicon::getSequence() {
 		while(sindx < length) {
 			ret[sindx++] = semiSeq_o[m++];
 		}
-		/*
-		if(errs) {
-			k = errs->getAlt();
-			while(k != bases.size()) {
-				j = errs->getPos();
-				if(errs->getErrType() == 0) {
-					semiSeq_o[j+spos] = 'X';
-				}
-				else {
-					semiSeq_o[j+spos] = bases[k];
-				}
-				errs++;
-				k = errs->getAlt();
-			}
-		}
-		for(i = 0, j = 0; i < length; j++) {
-			if(semiSeq_o[j+spos] != 'X') {
-				ret[i++] = semiSeq_o[j+spos];
-			}
-		}
-		*/
 		delete[] semiSeq_o;
 		
-		//cerr << "semi:(" << spos << ") " << ret << endl;
-		
+		// convert to 3'->5'
 		reverse(ret, ret+strlen(ret));
 		return ret;
 	}	
 }
 
+void* Amplicon::batchGetSequences(const void* args) {
+	AmpliconLink* pNodeRange = (AmpliconLink*) args;
+	AmpliconLink p = pNodeRange[0];
+	
+	AmpliconLink results = createNullLink();
+	while(p != pNodeRange[1]) {
+		char *seq = p->amplicon.getSequence();
+		p->amplicon.setSequence(seq);
+		p = p->link;
+	}
+}
+
 double Amplicon::getWeightedLength() {
-	int i, k, spos, gc;
-	char c;
-	char *s;
-	double weight, weightLen = 0;
-	unsigned int fragSize = Profile::fragSize;
-	char *ampliconSeq = getSequence();
-	unsigned int ampliconSize = strlen(ampliconSeq);
-	k = ampliconSize/fragSize;
-	for(i = 0; i < k; i++) {
-		spos = i*fragSize;
-		c = ampliconSeq[spos+fragSize];
-		ampliconSeq[spos+fragSize] = '\0';
-		s = &ampliconSeq[spos];
-		gc = calculateGCPercent(s);
-		ampliconSeq[spos+fragSize] = c;
-		
-		weight = profile.getGCFactor(gc)/fragSize;
-		weightLen += weight;
-	}
-	if(k*fragSize < ampliconSize) {
-		spos = k*fragSize;
-		s = &ampliconSeq[spos];
-		gc = calculateGCPercent(s);
-		
-		weight = profile.getGCFactor(gc)*(ampliconSize-k*fragSize)/(fragSize*fragSize);
-		weightLen += weight;
-	}
-	
-	delete[] ampliconSeq;
-	
-	return weightLen;
+	unsigned int fragSize = config.getIntPara("fragSize");
+	int gc = 100*getGCcontent()/getLength();
+	return profile.getGCFactor(gc)*(getLength())/(fragSize*fragSize);
 }
 
 void* Amplicon::yieldReads(const void* args) {
-	unsigned long* indexs = (unsigned long*) args;
-	unsigned long sindx = indexs[0];
-	unsigned long eindx = indexs[1];
-	unsigned long i;
+	AmpliconLink* pNodeRange = (AmpliconLink*) args;
+	AmpliconLink p = pNodeRange[0];
+	AmpliconLink fullAmplicons = malbac.getFullAmplicons();
 	int j, k, n, fragCount, failCount, seqLen;
-	vector<Amplicon>& amplicons = malbac.getFullAmplicons();
-	vector<short int>& readNumbers = malbac.getReadNumbers();
+	AmpliconLink amplicons = malbac.getFullAmplicons();
+	int* readNumbers = malbac.getReadNumbers();
 	
 	char *seq, *ampliconSeq, *fragSeq;
 	bool paired = config.isPairedEnd();
@@ -442,14 +434,28 @@ void* Amplicon::yieldReads(const void* args) {
 		outBuffer = new char[bufferSize];
 	}
 	
+	AmpliconLink q = fullAmplicons->link->link;
+	unsigned long i = 0;
+	while(q != p) {
+		q = q->link;
+		i++;
+	}
+	
 	long pos;
-	for(i = sindx; i <= eindx; i++) {
-		ampliconSeq = amplicons[i].getSequence();
-		ampliconLen = strlen(ampliconSeq);
-		if(ampliconLen < readLength) {
+	while(p != pNodeRange[1]) {
+		n = readNumbers[i++];
+		if(n == 0) {
+			p = p->link;
 			continue;
 		}
-		n = readNumbers[i];
+		ampliconSeq = p->amplicon.getSequence();
+		p = p->link;
+		ampliconLen = strlen(ampliconSeq);
+		if(ampliconLen < readLength) {
+			delete[] ampliconSeq;
+			continue;
+		}
+		
 		fragCount = 0;
 		failCount = 0;
 		while(n > 0) {
@@ -462,7 +468,7 @@ void* Amplicon::yieldReads(const void* args) {
 				ampliconSeq[pos+readLength] = c;
 				
 				k = 0;
-				sprintf(&buf[k], "@%d_%d\n", i, fragCount);
+				sprintf(&buf[k], "@%d#%d\n", i-1, fragCount);
 				k = strlen(buf);
 				seqLen = strlen(results)/2;
 				strncpy(&buf[k], &results[0], seqLen);
@@ -500,7 +506,7 @@ void* Amplicon::yieldReads(const void* args) {
 				ampliconSeq[pos+readLength] = c;
 				
 				k = 0;
-				sprintf(&buf1[k], "@%d_%d/1\n", i, fragCount);
+				sprintf(&buf1[k], "@%d#%d/1\n", i-1, fragCount);
 				k = strlen(buf1);
 				seqLen = strlen(results)/2;
 				strncpy(&buf1[k], &results[0], seqLen);
@@ -516,10 +522,12 @@ void* Amplicon::yieldReads(const void* args) {
 				seq = getComplementSeq(seq);
 				reverse(seq, seq+readLength);
 				results = profile.predict(seq, 0);
+				reverse(seq, seq+readLength);
+				getComplementSeq(seq);
 				ampliconSeq[pos+insertSize] = c;
 				
 				k = 0;
-				sprintf(&buf2[k], "@%d_%d/2\n", i, fragCount);
+				sprintf(&buf2[k], "@%d#%d/2\n", i-1, fragCount);
 				k = strlen(buf2);
 				seqLen = strlen(results)/2;
 				strncpy(&buf2[k], &results[0], seqLen);
@@ -564,5 +572,35 @@ void* Amplicon::yieldReads(const void* args) {
 	}
 	
 	return NULL;
+}
+
+AmpliconLink createNullLink() {
+	AmpliconLink p = (AmpliconLink) malloc(sizeof(AmpliconNode));
+	p->amplicon.setData(0);
+	p->link = p;
+	return p;
+}
+
+void insertLinkList(AmpliconLink& linkList, Amplicon& amplicon) {
+	AmpliconLink p = (AmpliconLink) malloc(sizeof(AmpliconNode));
+	p->amplicon = amplicon;
+	AmpliconLink q = linkList->link->link;
+	linkList->link->link = p;
+	p->link = q;
+	if(linkList->link == p) {
+		linkList = p;
+	}
+	Amplicon& amp = linkList->link->amplicon;
+	amp.setData(amp.getData()+1);
+}
+
+void printLinkList(AmpliconLink linkList) {
+	AmpliconLink p = linkList->link->link;
+	unsigned int i = 1;
+	while(p != linkList->link) {
+		cerr << i++ << '\t';
+		p = p->link;
+	}
+	cerr << endl;
 }
 

@@ -20,8 +20,6 @@
 #include "psiFunc.h"
 #include "Profile.h"
 
-int Profile::fragSize = 1000;
-
 Profile::Profile() {
 	subsDist1 = subsDist2 = NULL;
 	subsCdf1 = subsCdf2 = NULL;
@@ -259,7 +257,8 @@ int Profile::processRead(char* read) {
 	if(mapQuality < 15) {
 		return 0;
 	}
-
+	
+	chr = abbrOfChr(chr);
 	v_it = find(chromosomes.begin(), chromosomes.end(), chr);
 	if(v_it == chromosomes.end()) {
 		return 0;
@@ -418,7 +417,7 @@ int Profile::countGC(string chr, long position) {
 	/***evaluate GC-content effect on read counts***/	
 	static string preChr = "";
 	static long refLen;
-	static unsigned int winSize = fragSize;
+	static unsigned int winSize = config.getIntPara("fragSize");
 	static long rightPos = 0;
 	static long leftPos = -1;
 	static double GC = -1;
@@ -434,6 +433,11 @@ int Profile::countGC(string chr, long position) {
 	position -= 1;
 	
 	int i, k;
+	if(chr.compare("X") == 0 || chr.compare("Y") == 0 || chr.compare("M") == 0)
+	{
+		return -1;
+	}
+	/*
 	for(i = 0; i < chr.length(); i++) {
 		k = chr[i]-'0';
 		if(!(k >= 0 && k <= 9)) {
@@ -443,6 +447,7 @@ int Profile::countGC(string chr, long position) {
 	if(i < chr.length()) {
 		return -1;
 	}
+	*/
 	
 	if(preChr.compare(chr) == 0) {
 		if(refLen == 0) {
@@ -609,7 +614,7 @@ void Profile::initGCParas() {
 	gcStd = 1.0e-5;
 }
 
-void Profile::estimateGCParas() {
+void Profile::estimateGCParas(string outFile) {
 	int i, j, k;
 	
 	int bins = 50;
@@ -626,6 +631,9 @@ void Profile::estimateGCParas() {
 	}
 	delete[] counts;
 	
+	outFile = outFile + ".gc";
+	ofstream ofs;
+	ofs.open(outFile.c_str());
 	vector<int> indxs;
 	int *curCount = new int[bins];
 	double med_rc = median(readCounts);
@@ -635,6 +643,7 @@ void Profile::estimateGCParas() {
 			//readCounts[i] = log(readCounts[i]/med_rc+ZERO_FINAL);
 			readCounts[i] = readCounts[i]/(med_rc+ZERO_FINAL);
 			if(readCounts[i] < 3) {
+				ofs << readCounts[i] << '\t' << gcs[i] << endl;
 				indxs.push_back(i);
 			}
 		}
@@ -642,10 +651,11 @@ void Profile::estimateGCParas() {
 	}
 	delete[] curCount;
 	delete[] steps;
+	ofs.close();
 	
 	/*fitting locally weighted linear regression*/
 	double tau = 5;
-	double winSize = 0.03;
+	double winSize = 0.04;
 	Matrix<double> x(1, 2);
 	x.set(0, 0, 1);
 	int minGC = -1, maxGC = -1;
@@ -798,7 +808,7 @@ void Profile::normParas(bool isLoaded) {
 		if(config.isPairedEnd() && stdISize > 0) {
 			int meanInsertSize = config.getIntPara("isize")+1;
 			int intervalLen = 6 * stdISize;
-			int minInsertSize = max(meanInsertSize - intervalLen/2, config.getIntPara("readLength"));
+			int minInsertSize = max(meanInsertSize - intervalLen/2, (int) config.getIntPara("readLength"));
 			int maxInsertSize = 2*meanInsertSize - minInsertSize;
 			//cerr << stdISize << endl;
 			//cerr << minInsertSize << '\t' << maxInsertSize << '\t' << meanInsertSize << endl;
@@ -1185,7 +1195,7 @@ void Profile::initCDFs() {
 	//gc
 	for(l = 0; l < 101; l++) {
 		unsigned seed = chrono::system_clock::now().time_since_epoch().count();
-		default_random_engine generator(seed);
+		mt19937 generator(seed);
 		normal_distribution<double> normal(gcMeans[l], gcStd);
 		gc_generators.push_back(generator);
 		gc_normDists.push_back(normal);
@@ -1221,6 +1231,7 @@ void Profile::train(string proFile) {
 void Profile::train() {
 	string bamFile = config.getStringPara("bam");
 	string samtools = config.getStringPara("samtools");
+	string outFile = config.getStringPara("output");
 	if(samtools.empty()) {
 		samtools = "samtools";
 	}
@@ -1249,12 +1260,14 @@ void Profile::train() {
 
 	int wxs = (genome.getTargets().empty())? 0:1;
 	long minReadsRequired = 2000000;
-	if((wxs == 0 && count < minReadsRequired) || (wxs == 1 && count < 2*minReadsRequired)) {
+	double med_rc = median(readCounts);
+	// if((wxs == 0 && count < minReadsRequired) || (wxs == 1 && count < 2*minReadsRequired)) {
+	if(med_rc < 5) {
 		cerr << "\nWarning: no enough reads to evaluate GC-content effects!" << endl;		
 		initGCParas();
 	}
 	else {	
-		estimateGCParas();
+		estimateGCParas(outFile);
 	}
 	normParas(false);
 	saveResults();
@@ -1353,7 +1366,7 @@ int Profile::getRandBaseQuality() {
 char* Profile::predict(char* refSeq, int isRead1) {
 	if(refSeq == NULL || refSeq[0] == '\0') {
 		return NULL;
-	}
+	} 
 	
 	int i, j, k;
 	

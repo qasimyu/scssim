@@ -16,7 +16,7 @@ using namespace std;
 class Config {
 	private:
 		map<string, string> stringParas;
-		map<string, int> intParas;
+		map<string, long> intParas;
 		map<string, double> realParas;
 		
 	public:
@@ -28,8 +28,8 @@ class Config {
 		
 		string getStringPara(string paraName);
 		void setStringPara(string paraName, string value);
-		int getIntPara(string paraName);
-		void setIntPara(string paraName, int value);
+		long getIntPara(string paraName);
+		void setIntPara(string paraName, long value);
 		double getRealPara(string paraName);
 		void setRealPara(string paraName, double value);
 		

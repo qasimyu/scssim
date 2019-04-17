@@ -55,7 +55,7 @@ class Profile {
 		//GC-content bias
 		double gcMeans[101];
 		double gcStd;
-		vector<default_random_engine> gc_generators;
+		vector<mt19937> gc_generators;
 		vector<normal_distribution<double> > gc_normDists;
 		
 		vector<double> gcs;
@@ -66,7 +66,7 @@ class Profile {
 		void setBins();
 		
 		void initGCParas();
-		void estimateGCParas();
+		void estimateGCParas(string outFile);
 		int countGC(string chr, long position);
 		
 		void saveResults();
@@ -84,10 +84,6 @@ class Profile {
 	public:
 		Profile();
 		~Profile();
-		
-		static int fragSize;
-		
-		static int getFragSize() {return fragSize;}
 		
 		void init();
 		

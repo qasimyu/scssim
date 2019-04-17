@@ -706,7 +706,7 @@ void Genome::divideTargets() {
 		return;
 	}
 	int i, j, k;
-	unsigned int targetMaxSize = Profile::getFragSize();
+	unsigned int targetMaxSize = config.getIntPara("fragSize");
 	map<string, vector<Target> > newTargets;
 	map<string, vector<Target> >::iterator it, m_it;
 	for(it = targets.begin(); it != targets.end(); it++) {
@@ -781,8 +781,8 @@ void Genome::splitToFrags(vector<Fragment>& fragments) {
 			Fragment frag(chr, fragStartPos, chrLen-fragStartPos+1, 1);
 			fragments.push_back(frag);
 		}
-		
 		//complementary strand
+		
 		fragStartPos = 1;
 		while(fragStartPos <= chrLen) {
 			fragLen = randomInteger(Fragment::minSize, Fragment::maxSize+1);
@@ -797,6 +797,7 @@ void Genome::splitToFrags(vector<Fragment>& fragments) {
 			Fragment frag(chr, fragStartPos, chrLen-fragStartPos+1, -1);
 			fragments.push_back(frag);
 		}
+		
 	}
 	for(i = 0; i < fragments.size(); i++) {
 		fragments[i].createSequence();

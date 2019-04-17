@@ -51,8 +51,7 @@ class Fragment {
 		void createSequence();
 		char* getSequence() {return sequence;}
 		
-		//void amplify(vector<Amplicon>& semiAmplicons);
-		void amplify(vector<Amplicon>& semiAmplicons, unsigned long tmplIndx);
+		void amplify(AmpliconLink& results);
 		static void* batchAmplify(const void* args);
 };
 

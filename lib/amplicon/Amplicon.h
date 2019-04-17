@@ -12,6 +12,9 @@
 
 using namespace std;
 
+struct AmpliconNode;
+typedef AmpliconNode * AmpliconLink;
+
 //enum errorType {ADO, FP};
 
 class AmpError {
@@ -32,14 +35,13 @@ class AmpError {
 class Amplicon {
 	private:
 		unsigned char data[8]; // bits: isSemi(1), startPos(17), length(17), gcContent(17), primerNum(12)
-		//void *tmpl;
-		unsigned long tmplIndx;
+		void *tmpl;
 		AmpError *ampErrs;
+		char *sequence;
 		
 	public:	
-		Amplicon() {ampErrs = NULL;}
-		//Amplicon(bool isSemi, void *tmpl, AmpError *ampErrs, unsigned int startPos, unsigned int length, unsigned int gcContent);
-		Amplicon(bool isSemi, unsigned long tmplIndx, AmpError *ampErrs, unsigned int startPos, unsigned int length, unsigned int gcContent);
+		Amplicon() {ampErrs = NULL; sequence = NULL;}
+		Amplicon(bool isSemi, void *tmpl, AmpError *ampErrs, unsigned int startPos, unsigned int length, unsigned int gcContent);
 		
 		void clear();
 		
@@ -52,19 +54,32 @@ class Amplicon {
 		void setPrimers(unsigned short int primers);
 		unsigned short int getPrimers();
 		
-		//void* getTmpl() {return tmpl;}
+		unsigned int getData();
+		void setData(unsigned int n);
+		void* getTmpl() {return tmpl;}
 		AmpError* getErrs() {return ampErrs;}
 		void setErrs(AmpError *ampErrs) {this->ampErrs = ampErrs;}
-		
-		//void amplify(vector<Amplicon>& fullAmplicons);
-		void amplify(vector<Amplicon>& fullAmplicons, unsigned long tmplIndx);
-		static void* batchAmplify(const void* args);
+		void setSequence(char *seq) {sequence = seq;}
 		char* getSequence();
+		static void* batchGetSequences(const void* args);
+		
+		void amplify(AmpliconLink& results, AmpliconLink source);
+		static void* batchAmplify(const void* args);
 		
 		double getWeightedLength();
 		static void* yieldReads(const void* args);
 };
 
+struct AmpliconNode {
+	Amplicon amplicon;
+	struct AmpliconNode *link;
+};
+
+AmpliconLink createNullLink();
+
+void insertLinkList(AmpliconLink& linkList, Amplicon& amplicon);
+
+void printLinkList(AmpliconLink linkList);
 
 #endif
 

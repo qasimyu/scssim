@@ -38,67 +38,85 @@ void Fragment::describe() {
 }
 
 void Fragment::createSequence() {
+	sequence = genome.getSubSequence(chr, startPos-1, length);
 	if(strand == 1) {
-		sequence = genome.getSubSequence(chr, startPos-1, length);
+		reverse(sequence, sequence+strlen(sequence));
 	}
 	else {
-		long chrLen = genome.getChromLen(chr);
-		sequence = genome.getSubSequence(chr, chrLen-startPos-length+1, length);
 		sequence = getComplementSeq(sequence);
-		reverse(sequence, sequence+strlen(sequence));
 	}
 	gcContent = countGC(sequence);
 }
 
-void Fragment::amplify(vector<Amplicon>& semiAmplicons, unsigned long tmplIndx) {
+void Fragment::amplify(AmpliconLink& results) {
 	unsigned int i, j, k, n;
 	unsigned int spos, ampliconLen, curSize;
 	double ador = config.getRealPara("ador");
-	double fpr = config.getRealPara("fpr");
-	char* fragSeq = getSequence();
+	double ber = config.getRealPara("ber");
+	
 	string bases = config.getStringPara("bases");
 	int maxLen = config.getIntPara("ampliconMaxLen");
 	int minLen = config.getIntPara("ampliconMinLen");
+	
+	if(length < minLen+27) {
+		return;
+	}
+	
+	char* fragSeq = getSequence();
+	char* fragSeq_c = new char[strlen(fragSeq)+1];
+	strcpy(fragSeq_c, fragSeq);
+	fragSeq_c = getComplementSeq(fragSeq_c);
+	
 	short int* posAttached = new short int[length];
 	memset(posAttached, 0, length*sizeof(short int));
 	
 	for(i = 0; i < primerNum; i++) {
 		int tryTimes = 0;
 		do {
-			spos = threadPool->randomInteger(0, length-34);
-			ampliconLen = threadPool->randomInteger(minLen, maxLen+1);
+			spos = threadPool->randomInteger(27, length);
+			ampliconLen = threadPool->randomDouble(minLen, maxLen+1);
 			tryTimes++;
 			if(tryTimes > 50) {
 				break;
 			}
-		} while(spos+ampliconLen > length || posAttached[spos+ampliconLen-1] == 1);
+			if(spos+ampliconLen > length || posAttached[spos] == 1) {
+				continue;
+			}
+			char c = fragSeq_c[spos+8];
+			fragSeq_c[spos+8] = '\0';
+			j = malbac.updatePrimerCount(&fragSeq_c[spos], -1);
+			fragSeq_c[spos+8] = c;
+			if(j == 1) {
+				break;
+			}
+		} while(1);
 		if(tryTimes > 50) {
 			break;
 		}
 		
-		posAttached[spos+ampliconLen-1] = 1;
-
-		char c = fragSeq[spos+ampliconLen];
-		fragSeq[spos+ampliconLen] = '\0';
-		int gcNum = countGC(fragSeq+spos);
-		fragSeq[spos+ampliconLen] = c;
+		posAttached[spos] = 1;
+		
+		char c = fragSeq_c[spos+ampliconLen];
+		fragSeq_c[spos+ampliconLen] = '\0';
+		int gcNum = countGC(fragSeq_c+spos);
+		fragSeq_c[spos+ampliconLen] = c;	
 		
 		vector<AmpError> errs;
 		k = 0;
-		for(j = 0; j < ampliconLen-8; j++) {
+		for(j = 8; j < ampliconLen; j++) {
 			double p = threadPool->randomDouble(0, 1);
 			if(p <= ador) {
 				AmpError ampErr(0, j, 0);
 				errs.push_back(ampErr);
 				k++;
-				if(fragSeq[spos+j] == 'C' || fragSeq[spos+j] == 'G') {
+				if(fragSeq_c[spos+j] == 'C' || fragSeq_c[spos+j] == 'G') {
 					gcNum--;
 				}
 				continue;
 			}
 			p = threadPool->randomDouble(0, 1);
-			if(p <= fpr) {
-				char base = getComplementBase(fragSeq[spos+j]);
+			if(p <= ber) {
+				char base = fragSeq_c[spos+j];
 				do {
 					n = threadPool->randomInteger(0, bases.size());
 				} while(bases[n] == base);
@@ -123,11 +141,10 @@ void Fragment::amplify(vector<Amplicon>& semiAmplicons, unsigned long tmplIndx) 
 			}
 			ampErrs[j].setAlt(bases.size());
 		}
-		//Amplicon tmp(true, this, ampErrs, spos, ampliconLen-k, gcNum);
-		Amplicon tmp(true, tmplIndx, ampErrs, spos, ampliconLen-k, gcNum);
-		semiAmplicons.push_back(tmp);
+		Amplicon tmp(true, this, ampErrs, spos, ampliconLen-k, max(0, gcNum));
+		insertLinkList(results, tmp);
 	}
-	//delete[] fragSeq;
+	delete[] fragSeq_c;
 	delete[] posAttached;
 }
 
@@ -137,11 +154,10 @@ void* Fragment::batchAmplify(const void* args) {
 	unsigned long eindx = indexs[1];
 	unsigned long i;
 	vector<Fragment>& frags = malbac.getFrags();
-	vector<Amplicon> results;
+	AmpliconLink results = createNullLink();
 	
 	for(i = sindx; i <= eindx; i++) {
-		//frags[i].amplify(results);
-		frags[i].amplify(results, i);
+		frags[i].amplify(results);
 	}
 	
 	malbac.extendSemiAmplicons(results);

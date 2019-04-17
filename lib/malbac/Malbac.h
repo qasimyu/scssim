@@ -15,14 +15,31 @@
 
 using namespace std;
 
+class PrimerIndex {
+	public:
+		int index;
+		long count;
+		map<char, PrimerIndex> nextIndexs;
+		PrimerIndex() {index = -1;}
+};
+
 class Malbac {
 	private:
-		vector<Fragment> fragments;
-		vector<Amplicon> semiAmplicons;
-		vector<Amplicon> fullAmplicons;
-		vector<short int> readNumbers;
+		unsigned long totalPrimers;
+		char **primers;
+		int ptypeCount;
+		PrimerIndex rIndex;
 		
-		mutable pthread_mutex_t pm;
+		vector<Fragment> fragments;
+		//vector<Amplicon> semiAmplicons;
+		//vector<Amplicon> fullAmplicons;
+		AmpliconLink semiAmplicons;
+		AmpliconLink fullAmplicons;
+		int* readNumbers;
+		
+		mutable pthread_mutex_t pm_amp, pm_primer;
+		
+		void createPrimers();
 		
 		void amplifyFrags();
 		void amplifySemiAmplicons();
@@ -30,21 +47,28 @@ class Malbac {
 		void setPrimers(bool onlyFrags);
 		void saveFullAmplicons(ofstream& ofs);
 		
-		void setReadCounts(unsigned long reads);
+		void setReadCounts(long reads);
 		
 	public:
 		Malbac();
-		~Malbac() {}
+		~Malbac();
+		
+		long getPrimerCount(const char *s);
+		int updatePrimerCount(const char *s, int n);
 		
 		vector<Fragment>& getFrags() {return fragments;}
 		Fragment& getFrag(unsigned long i) {return fragments[i];}
-		vector<Amplicon>& getSemiAmplicons() {return semiAmplicons;}
-		Amplicon& getSemiAmplicon(unsigned long i) {return semiAmplicons[i];}
-		vector<Amplicon>& getFullAmplicons() {return fullAmplicons;}
-		vector<short int>& getReadNumbers() {return readNumbers;}
+		//vector<Amplicon>& getSemiAmplicons() {return semiAmplicons;}
+		AmpliconLink getSemiAmplicons() {return semiAmplicons;}
+		//Amplicon& getSemiAmplicon(unsigned long i) {return semiAmplicons[i];}
+		//vector<Amplicon>& getFullAmplicons() {return fullAmplicons;}
+		AmpliconLink getFullAmplicons() {return fullAmplicons;}
+		unsigned long getAmpliconCount(AmpliconLink linkList);
 		
-		void extendSemiAmplicons(vector<Amplicon>& amplicons);
-		void extendFullAmplicons(vector<Amplicon>& amplicons);
+		int* getReadNumbers() {return readNumbers;}
+		
+		void extendSemiAmplicons(AmpliconLink amplicons);
+		void extendFullAmplicons(AmpliconLink amplicons);
 		
 		void createFrags();
 		void amplify();
