@@ -2,7 +2,7 @@
 
 SCSsim is a tool designed for emulating single-cell genome sequencing data. It consists of three modules: 1) “simuVars” module aims to generate single cell genome from a given reference sequence by inserting user-defined genomic variations into specific genomic loci; 2) “learnProfile” component is developed to infer sequencing platform dependent profiles from real data; 3) “genReads” utility is provided to mimic single-cell genome amplification and read generation procedures based on the results of “simuVars” and “learnProfile”. More details about the software can be found from [here](https://github.com/qasimyu/scssim/tree/master/docs/SCSsim_User_Guide.pdf).
 
-![Framework Design](docs/workflow.tif)
+![Framework Design](docs/workflow.png)
 
 ## Requirements
 
@@ -64,7 +64,7 @@ Please cite SCSsim in your publications if it helps your research:
 @incollection{yu2019scssim,
   author = {Zhenhua Yu, Ao Li},
   title = {SCSsim: simulating single-cell genome se-quencing data},
-  year = {2018, under review},
+  year = {2019, under review},
 }
 ```
 
