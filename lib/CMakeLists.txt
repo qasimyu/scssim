@@ -15,6 +15,11 @@ add_library(split split/split.cpp)
 include_directories(threadpool)
 add_library(threadpool threadpool/ThreadPool.cpp)
 
+# Build the vcfparser library
+include_directories(vcfparser)
+add_library(vcfparser vcfparser/vcfparser.cpp)
+target_link_libraries(vcfparser split)
+
 # Build the seqwriter library
 include_directories(seqwriter)
 add_library(seqwriter seqwriter/SeqWriter.cpp)
@@ -47,7 +52,7 @@ target_link_libraries(fragment mydefine amplicon)
 # Build the genome library
 include_directories(genome)
 add_library(genome genome/Genome.cpp)
-target_link_libraries(genome fastahack snp split mydefine fragment profile)
+target_link_libraries(genome fastahack snp split mydefine fragment profile vcfparser)
 
 # Build the malbac library
 include_directories(malbac)

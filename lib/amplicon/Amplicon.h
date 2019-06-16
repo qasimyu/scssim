@@ -15,7 +15,7 @@ using namespace std;
 struct AmpliconNode;
 typedef AmpliconNode * AmpliconLink;
 
-//enum errorType {ADO, FP};
+//enum errorType {Del, Base_substitution};
 
 class AmpError {
 	private:

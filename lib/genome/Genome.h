@@ -12,52 +12,25 @@
 
 #include "Fragment.h"
 #include "snp.h"
+#include "vcfparser.h"
 #include "Fasta.h"
 
 using namespace std;
 
 class CNV {
 	public:
-		CNV() {}
+		CNV() {spos = -1;}
 		CNV(long spos, long epos, float CN, float mCN)
 			: spos(spos), epos(epos), CN(CN), mCN(mCN) {}
-		~CNV() {}
+		long getStartPos() {return spos;}
+		long getEndPos() {return epos;}
+		float getCopyNumber() {return CN;}
+		float getMajorCopyNumber() {return mCN;}
+		
 		long spos;
 		long epos;
 		float CN;
 		float mCN;
-};
-
-class SNV {
-	public:
-		SNV() {}
-		SNV(long pos, char ref, char alt, string type)
-			: pos(pos), ref(ref), alt(alt), type(type) {}
-		~SNV() {}
-		long pos;
-		char ref;
-		char alt;
-		string type;
-};
-
-class Insert {
-	public:
-		Insert() {}
-		Insert(long pos, string seq) : pos(pos), seq(seq), type(type) {}
-		~Insert() {}
-		long pos;
-		string seq;
-		string type;
-};
-
-class Del {
-	public:
-		Del() {}
-		Del(long pos, unsigned int len, string type) : pos(pos), len(len), type(type) {}
-		~Del() {}
-		long pos;
-		unsigned int len;
-		string type;
 };
 
 class Target {
@@ -76,19 +49,26 @@ class Genome {
 		map<string, vector<CNV> > cnvs;
 		map<string, vector<SNV> > snvs;
 		map<string, vector<Insert> > inserts;
-		map<string, vector<Del> > dels;
+		map<string, vector<Deletion> > dels;
 		
 		map<string, vector<Target> > targets;
 		
-		SNPOnChr sc;	
+		SNPOnChr sc;
+		VcfParser vcfParser;		
 		FastaReference fr;
 		
 		//map<string, string> altSequence;
+		string refSequence;
 		string altSequence;
 		string curChr;
 		
+		void loadAbers();
+		void loadSNPs();
+		void loadRefSeq();
+		void loadTargets();
+		
 		void divideTargets();
-		void generateAltSequence(string chr);
+		void generateChrSequence(string chr);
 		
 		void generateSegment(vector<string>& sequences, string chr, long segStartPos, long segEndPos, int CN, int mCN);
 		
@@ -97,19 +77,20 @@ class Genome {
 		~Genome() {}
 
 		void loadData();
-		void loadAbers();
-		void loadSNPs(bool isvcf);
-		void loadRefSeq();
-		void loadTargets();
+		void loadTrainData();
 		void saveSequence();
 
 		vector<string>& getChroms() {return chromosomes;}
 		
-		vector<CNV>& getCNVs(string chr) {return cnvs[chr];}
-		vector<SNV>& getSNVs(string chr) {return snvs[chr];}
-		vector<SNP>& getSNPs(string chr) {return sc[chr];}
-		vector<Insert>& getInserts(string chr) {return inserts[chr];}
-		vector<Del>& getDels(string chr) {return dels[chr];}
+		vector<CNV>& getSimuCNVs(string chr) {return cnvs[chr];}
+		vector<SNV>& getSimuSNVs(string chr) {return snvs[chr];}
+		vector<SNV>& getRealSNVs(string chr) {return vcfParser.getSNVs(chr);}
+		vector<SNP>& getSimuSNPs(string chr) {return sc[chr];}
+		vector<Insert>& getSimuInserts(string chr) {return inserts[chr];}
+		vector<Insert>& getRealInserts(string chr) {return vcfParser.getInserts(chr);}
+		vector<Deletion>& getSimuDels(string chr) {return dels[chr];}
+		vector<Deletion>& getRealDels(string chr) {return vcfParser.getDels(chr);}
+
 		vector<Target>& getTargets(string chr) {return targets[chr];}
 		
 		map<string, vector<Target> >& getTargets() {return targets;}
@@ -118,6 +99,7 @@ class Genome {
 		long getGenomeLength();
 		
 		char* getSubSequence(string chr, int startPos, int length);
+		char* getSubRefSequence(string chr, int startPos, int length);
 		char* getSubAltSequence(string chr, int startPos, int length);
 		
 		void splitToFrags(vector<Fragment>& fragments);

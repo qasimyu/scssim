@@ -22,10 +22,8 @@ int main(int argc, char *argv[]) {
 	
 	parseArgs(argc, argv);
 
-	/*** create genome data ***/
-	genome.loadSNPs(true);
-	genome.loadRefSeq();
-	genome.loadTargets();
+	/*** load data ***/
+	genome.loadTrainData();
 
 	/*** profile learning ***/
 	profile.init();
@@ -44,6 +42,8 @@ void parseArgs(int argc, char *argv[]) {
 	string bamFile = "", targetFile = "";
 	string vcfFile = "", refFile = "";
 	string outFile = "", samtools = "";
+	int wsize = 1000;
+	int kmer = 3;
 
 	/*** record elapsed time ***/
 	time_t start_t, end_t;
@@ -56,6 +56,8 @@ void parseArgs(int argc, char *argv[]) {
 		{"target", required_argument, 0, 't'},
 		{"vcf", required_argument, 0, 'v'},
 		{"ref", required_argument, 0, 'r'},
+		{"wsize", required_argument, 0, 'w'},
+		{"kmer", required_argument, 0, 'k'},
 		{"output", required_argument, 0, 'o'},
 		{"samtools", required_argument, 0, 's'},
 		{0, 0, 0, 0}
@@ -63,7 +65,7 @@ void parseArgs(int argc, char *argv[]) {
 
 	int c;
 	//Parse command line parameters
-	while((c = getopt_long(argc, argv, "hb:t:v:r:o:s:", long_options, NULL)) != -1) {
+	while((c = getopt_long(argc, argv, "hb:t:v:r:w:k:o:s:", long_options, NULL)) != -1) {
 		switch(c){
 			case 'h':
 				usage(argv[0]);
@@ -79,6 +81,12 @@ void parseArgs(int argc, char *argv[]) {
 				break;
 			case 'r':
 				refFile = optarg;
+				break;
+			case 'w':
+				wsize = atoi(optarg);
+				break;
+			case 'k':
+				kmer = atoi(optarg);
 				break;
 			case 'o':
 				outFile = optarg;
@@ -125,12 +133,25 @@ void parseArgs(int argc, char *argv[]) {
 		cerr << "Assume the tool has been installed and included in the system PATH!" << endl;
 	}
 	
+	if(wsize < 100) {
+		cerr << "Error: the value of parameter \"wsize\" should be at least 100!" << endl;
+		usage(argv[0]);
+		exit(1);
+	}
+	
+	if(kmer < 1 || kmer > 5) {
+		cerr << "Error: parameter \"kmer\" should be a positive integer with maximum value of 5!" << endl;
+		exit(1);
+	}
+	
 	config.setStringPara("bam", bamFile);
 	config.setStringPara("ref", refFile);
 	config.setStringPara("target", targetFile);
-	config.setStringPara("snp", vcfFile);
+	config.setStringPara("vcf", vcfFile);
 	config.setStringPara("samtools", samtools);
 	config.setStringPara("output", outFile);
+	config.setIntPara("fragSize", wsize);
+	config.setIntPara("kmer", kmer);
 }
 
 void usage(const char* app) {
@@ -143,6 +164,8 @@ void usage(const char* app) {
 		<< "    -t, --target <string>           exome target file (.bed) for whole-exome sequencing[default:null]" << endl
 		<< "    -v, --vcf <string>              the VCF file generated from the normal BAM" << endl
 		<< "    -r, --ref <string>              genome reference file (.fasta) to which the reads were aligned" << endl
+		<< "    -w, --wsize <int>               the length of windows used to infer GC-content bias[default:1000]" << endl
+		<< "    -k, --kmer <int>                the length of kmer sequence [default:3]" << endl
 		<< "    -o, --output <string>           output file" << endl
 		<< "    -s, --samtools <string>         the path of samtools [default:samtools]" << endl
 		<< endl

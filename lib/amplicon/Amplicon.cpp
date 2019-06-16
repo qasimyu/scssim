@@ -156,7 +156,6 @@ void Amplicon::setData(unsigned int n) {
 void Amplicon::amplify(AmpliconLink& results, AmpliconLink source) {
 	unsigned int i, j, k, n;
 	unsigned int spos, ampliconLen;
-	double ador = config.getRealPara("ador");
 	double ber = config.getRealPara("ber");
 	string bases = config.getStringPara("bases");
 	unsigned int length = getLength();
@@ -173,7 +172,7 @@ void Amplicon::amplify(AmpliconLink& results, AmpliconLink source) {
 	//char* semiAmpSeq_c = semiAmpSeq;
 	short int* posAttached = new short int[length];
 	memset(posAttached, 0, length*sizeof(unsigned short int));
-	
+
 	for(i = 0; i < primerNum; i++) {
 		int tryTimes = 0;
 		do {
@@ -206,20 +205,9 @@ void Amplicon::amplify(AmpliconLink& results, AmpliconLink source) {
 		semiAmpSeq_c[spos+ampliconLen] = c;
 		
 		vector<AmpError> errs;
-		k = 0;
 		for(j = 8; j < ampliconLen; j++) {
 			double p = threadPool->randomDouble(0, 1);
-			if(p <= ador) {
-				AmpError ampErr(0, j, 0);
-				errs.push_back(ampErr);
-				k++;
-				if(semiAmpSeq_c[spos+j] == 'C' || semiAmpSeq_c[spos+j] == 'G') {
-					gcNum--;
-				}
-				continue;
-			}
-			p = threadPool->randomDouble(0, 1);
-			if(p <= ber) {
+			if(p < ber) {
 				char base = semiAmpSeq_c[spos+j];
 				do {
 					n = threadPool->randomDouble(0, bases.size());
@@ -243,7 +231,7 @@ void Amplicon::amplify(AmpliconLink& results, AmpliconLink source) {
 			}
 			ampErrs[j].setAlt(bases.size());
 		}
-		Amplicon tmp(false, source, ampErrs, spos, ampliconLen-k, max(0, gcNum));
+		Amplicon tmp(false, source, ampErrs, spos, ampliconLen, max(0, gcNum));
 		insertLinkList(results, tmp);
 	}
 	

@@ -23,9 +23,7 @@ int main(int argc, char *argv[]) {
 	parseArgs(argc, argv);
 	
 	/*** load data ***/
-	genome.loadAbers();
-	genome.loadSNPs(false);
-	genome.loadRefSeq();
+	genome.loadData();
 	/*** create and save sequences ***/
 	genome.saveSequence();
 	

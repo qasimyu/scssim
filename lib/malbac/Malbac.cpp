@@ -150,10 +150,19 @@ unsigned long Malbac::getAmpliconCount(AmpliconLink linkList) {
 
 void Malbac::amplify() {
 	cerr << "\nMALBAC amplification..." << endl;
+	
+	double gamma = config.getRealPara("gamma");
+	if(gamma <= 0 || gamma > 0.001) {
+		unsigned long refLen = genome.getGenomeLength()/2;
+		gamma = 3.0e-7*refLen/1000000;
+		config.setRealPara("gamma", gamma);
+		cerr << "the value of parameter \"gamma\" was set to " << gamma << endl;
+	}
+	
 	createPrimers();
 	setPrimers(true);
 	amplifyFrags();
-	cerr << getAmpliconCount(semiAmplicons) << endl;
+	//cerr << getAmpliconCount(semiAmplicons) << endl;
 	for(int i = 0; i < 5; i++) {
 		if(totalPrimers == 0) {
 			break;
@@ -161,11 +170,11 @@ void Malbac::amplify() {
 		cerr << "cycle number: " << i+1 << endl;
 		setPrimers(false);
 		amplifySemiAmplicons();
-		cerr << getAmpliconCount(fullAmplicons) << endl;
+		//cerr << getAmpliconCount(fullAmplicons) << endl;
 		cerr << "semi amplicon amplification done!" << endl;
 		if(i < 4) {
 			amplifyFrags();
-			cerr << getAmpliconCount(semiAmplicons) << endl;
+			//cerr << getAmpliconCount(semiAmplicons) << endl;
 			cerr << "fragment amplification done!" << endl;
 		}
 	}
@@ -206,17 +215,13 @@ void Malbac::amplifyAndSaveProducts() {
 }
 
 void Malbac::setPrimers(bool onlyFrags) {
-	unsigned long i, k;
+	unsigned long i, j, k;
 	unsigned long templateNum = 0, fragNum = fragments.size();
 	unsigned int length, gcContent;
-	double gcSum = 0, totalLen = 0;
-	
+	double totalLen = 0;
 	
 	for(i = 0; i < fragNum; i++) {
-		gcContent = fragments[i].getGCcontent();
 		length = fragments[i].getLength();
-		//gcSum += 1.0*gcContent/Fragment::maxSize;
-		gcSum += 1.0*length/Fragment::maxSize;
 		totalLen += length;
 	}
 	templateNum += fragNum;
@@ -225,11 +230,8 @@ void Malbac::setPrimers(bool onlyFrags) {
 		AmpliconLink p = semiAmplicons->link->link;
 		templateNum += getAmpliconCount(semiAmplicons);
 		while(p != semiAmplicons->link) {
-			Amplicon& amplicon = p->amplicon;
-			gcContent = amplicon.getGCcontent(); 
+			Amplicon& amplicon = p->amplicon; 
 			length = amplicon.getLength();
-			//gcSum += 1.0*gcContent/Fragment::maxSize;
-			gcSum += 1.0*length/Fragment::maxSize;
 			totalLen += length;
 			p = p->link;
 		}
@@ -239,10 +241,8 @@ void Malbac::setPrimers(bool onlyFrags) {
 	unsigned long usedPrimers = totalPrimers*gamma;
 	unsigned long count = 0;
 	for(i = 0; i < fragNum; i++) {
-		gcContent = fragments[i].getGCcontent();
 		length = fragments[i].getLength();
-		//k = 1.0*gcContent/Fragment::maxSize*usedPrimers/gcSum;
-		k = 1.0*length/Fragment::maxSize*usedPrimers/gcSum;
+		k = 1.0*length/totalLen*usedPrimers;
 		fragments[i].setPrimers(k);
 		count += k;
 	}
@@ -250,16 +250,35 @@ void Malbac::setPrimers(bool onlyFrags) {
 		AmpliconLink p = semiAmplicons->link->link;
 		while(p != semiAmplicons->link) {
 			Amplicon& amplicon = p->amplicon;
-			gcContent = amplicon.getGCcontent();
 			length = amplicon.getLength();
-			//k = 1.0*gcContent/Fragment::maxSize*usedPrimers/gcSum;
-			k = 1.0*length/Fragment::maxSize*usedPrimers/gcSum;
+			k = 1.0*length/totalLen*usedPrimers;
 			amplicon.setPrimers(k);
 			count += k;
 			p = p->link;
 		}
 	}
-	totalPrimers -= count;
+	long n = usedPrimers-count;
+	while(n > 0) {
+		j = threadPool->randomInteger(0, 50);
+		if(j > n) j = n;
+		i = threadPool->randomInteger(0, templateNum);
+		if(i < fragNum) {
+			fragments[i].setPrimers(fragments[i].getPrimers()+j);
+		}
+		else {
+			i -= fragNum;
+			AmpliconLink p = semiAmplicons->link;
+			k = 0;
+			while(k <= i) {
+				p = p->link;
+				k++;
+			}
+			Amplicon& amplicon = p->amplicon;
+			amplicon.setPrimers(amplicon.getPrimers()+j);
+		}
+		n -= j;
+	}
+	totalPrimers -= usedPrimers;
 }
 
 void Malbac::saveFullAmplicons(ofstream& ofs) {
@@ -346,39 +365,6 @@ void Malbac::amplifySemiAmplicons() {
 		delete[] threadParas[i];
 	}
 }
-/*
-void Malbac::setReadCounts(long reads) {
-	unsigned long i;
-	unsigned long ampliconNum = getAmpliconCount(fullAmplicons);
-	double WL = 0;
-	vector<double> wls;
-	AmpliconLink p = fullAmplicons->link->link;
-	while(p != fullAmplicons->link) {
-		double wl = p->amplicon.getWeightedLength();
-		WL += wl;
-		wls.push_back(wl);
-		p = p->link;
-	}
-	
-	long sum = 0;
-	i = 0;
-	p = fullAmplicons->link->link;
-	while(p != fullAmplicons->link) {
-		//long readCount = (p->amplicon.getWeightedLength()/WL)*reads;
-		long readCount = (wls[i++]/WL)*reads;
-		readNumbers.push_back(readCount);
-		sum += readCount;
-		p = p->link;
-	}
-	long n = reads-sum;
-	cerr << sum << endl;
-	while(n > 0) {
-		i = threadPool->randomInteger(0, ampliconNum);
-		readNumbers[i] += 1;
-		n -= 1;
-	}
-}
-*/
 
 void Malbac::setReadCounts(long reads) {
 	int k = config.isPairedEnd()? 2:1;

@@ -32,18 +32,18 @@ Users can use “simuVars” program to simulate the genome sequence of single c
 Example:
 
 ```
-./bin/simuVars -r <reference>.fasta –s /path/to/snp.txt -v /path/to/variation.txt –o /path/to/output.fasta
+./bin/simuVars -r ./testData/refs/ref.fa.gz -s ./testData/snps/snp.txt -v ./testData/vars/vars.txt -o ./results/simu.fa
 ```
 
-### Step 2: infer sequencing profiles from real datasets
+### Step 2 (optional): infer sequencing profiles from real datasets
 
-The “learnProfile” utility is designed to infer sequencing profiles from real sequencing data generated from Illumina instruments. In the current version, only three profiles including base substitution probabilities, Phred quality distributions and GC-content bias are measured. Users can build their own profiles from a given real dataset using this utility. 
+The “learnProfile” utility is designed to infer sequencing profiles from real sequencing data generated from Illumina instruments. In the current version, four profiles including indel error distributions, base substitution probabilities, Phred quality distributions and GC-content bias are measured. The profiles from several Illumina platforms are available in directory ./testData/models, and users can build their own profiles from a given real dataset using this utility. 
 
 Examples:
 
 ```
-./bin/learnProfile -b <sample>.bam -t <targets>.bed -v <sample>.vcf -r <reference>.fasta > <sample>.profile
-./bin/learnProfile -b <sample>.bam -v <sample>.vcf -r <reference>.fasta -o <sample>.profile –s /path/to/samtools
+./bin/learnProfile -b <sample>.bam -t <targets>.bed -v <sample>.vcf -r <reference>.fa > <sample>.profile
+./bin/learnProfile -b <sample>.bam -v <sample>.vcf -r <reference>.fa -o <sample>.profile –s /path/to/samtools
 ```
 
 ### Step 3: amplify single cell genome and generate reads
@@ -53,7 +53,7 @@ The “genReads” program is developed to simulate single-end or paired-end rea
 Example:
 
 ```
-./bin/simuReads -i /path/to/simu.fa -m /path/to/hiseq2500.profile -t 5 -o /path/to/reads
+./bin/genReads -i ./results/simu.fa -m ./testData/models/Illumina_HiSeq2500.profile -t 5 -o ./results/reads
 ```
 
 ## Citation
@@ -62,8 +62,8 @@ Please cite SCSsim in your publications if it helps your research:
 
 ``` bibtex
 @incollection{yu2019scssim,
-  author = {Zhenhua Yu, Ao Li},
-  title = {SCSsim: simulating single-cell genome se-quencing data},
+  author = {Zhenhua Yu, Fang Du, Xuehong Sun, Ao Li},
+  title = {SCSsim: an integrated tool for simulating single-cell genome sequencing data},
   year = {2019, under review},
 }
 ```

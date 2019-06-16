@@ -12,7 +12,7 @@
 
 Config::Config() {
 	string strParaNames[] = {"bam", "profile", "ref", "target", "var", "snp",
-							"samtools", "bases", "output", "layout"};
+							"vcf", "samtools", "bases", "output", "layout"};
 	
 	/*---start default configuration---*/
 	
@@ -34,7 +34,7 @@ Config::Config() {
 	intParas.insert(make_pair("readLength", 0));
 	intParas.insert(make_pair("coverage", 0));
 	intParas.insert(make_pair("ploidy", 2));
-	intParas.insert(make_pair("isize", 300));
+	intParas.insert(make_pair("isize", 260));
 	intParas.insert(make_pair("kmer", 3));
 	intParas.insert(make_pair("bins", 0));
 	intParas.insert(make_pair("ampliconMaxLen", 2000));
@@ -42,9 +42,9 @@ Config::Config() {
 	intParas.insert(make_pair("fragSize", 1000));
 	
 	realParas.insert(make_pair("indelRate", 0.00025));
-	realParas.insert(make_pair("gamma", 0.9));
-	realParas.insert(make_pair("ador", 0.01));
-	realParas.insert(make_pair("ber", 0.002));
+	realParas.insert(make_pair("gamma", -1));
+	realParas.insert(make_pair("ber", 3.4e-4));
+	// refer to https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0105585
 	/*---end default configuration---*/
 }
 

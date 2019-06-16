@@ -15,15 +15,28 @@
 #include "MyDefine.h"
 #include "Genome.h"
 
+void Genome::loadData() {
+	loadAbers();
+	loadSNPs();
+	loadRefSeq();
+	loadTargets(); // WES is currently not supported
+	
+	curChr = "nodefined";
+}
+
+void Genome::loadTrainData() {
+	vcfParser.setVCF(config.getStringPara("vcf"));
+	vcfParser.parse();
+	loadRefSeq();
+	loadTargets();
+	curChr = "nodefined";
+}
+
 void Genome::loadAbers() {
 	string aberFile = config.getStringPara("var");
 	if(aberFile.empty()) {
 		return;
 	}
-	map<string, vector<CNV> >::iterator m1_it;
-	map<string, vector<SNV> >::iterator m2_it;
-	map<string, vector<Insert> >::iterator m3_it;
-	map<string, vector<Del> >::iterator m4_it;
 	
 	ifstream ifs;
 	ifs.open(aberFile.c_str());
@@ -52,30 +65,20 @@ void Genome::loadAbers() {
 				exit(1);
 			}
 			string chr = abbrOfChr(fields[1]);
-			CNV cnv;
-			cnv.spos = atol(fields[2].c_str());// 1-based
-			cnv.epos = atol(fields[3].c_str());// 1-based
-			cnv.CN = atof(fields[4].c_str());
-			cnv.mCN = atof(fields[5].c_str());
-			if(cnv.CN < cnv.mCN) {
+			long spos = atol(fields[2].c_str());// 1-based
+			long epos = atol(fields[3].c_str());// 1-based
+			float cn = atof(fields[4].c_str());
+			float mcn = atof(fields[5].c_str());
+			if(cn < mcn) {
 				cerr << "ERROR: total copy number should be not lower than major copy number at line " << lineNum << " in file " << aberFile << endl;
 				cerr << line << endl;
 				exit(1);
 			}
-			if(cnv.CN-cnv.mCN > cnv.mCN) {
-				cnv.mCN = cnv.CN-cnv.mCN;
+			if(cn-mcn > mcn) {
+				mcn = cn-mcn;
 			}
-			for(m1_it = cnvs.begin(); m1_it != cnvs.end(); m1_it++) {
-				if((*m1_it).first.compare(chr) == 0) {
-					(*m1_it).second.push_back(cnv);
-					break;
-				}
-			}
-			if(m1_it == cnvs.end()) {
-				vector<CNV> temp;
-				temp.push_back(cnv);
-				cnvs.insert(make_pair(chr, temp));
-			}
+			CNV cnv(spos, epos, cn, mcn);
+			cnvs[chr].push_back(cnv);
 			cnvCount++;
 		}
 		//SNV
@@ -86,32 +89,23 @@ void Genome::loadAbers() {
 				exit(1);
 			}
 			string chr = abbrOfChr(fields[1]);
-			SNV snv;
-			snv.pos = atol(fields[2].c_str());// 1-based
-			snv.ref = fields[3].at(0);
-			snv.alt = fields[4].at(0);
-			snv.type = fields[5];
-			if(snv.ref == snv.alt) {
+			long pos = atol(fields[2].c_str());// 1-based
+			char ref = fields[3].at(0);
+			char alt = fields[4].at(0);
+			if(ref == alt) {
 				cerr << "ERROR: the mutated allele should be not same as the reference allele at line " << lineNum << " in file " << aberFile << endl;
 				cerr << line << endl;
 				exit(1);
 			}
-			if(snv.type.compare("homo") != 0 && snv.type.compare("het") != 0) {
+			string typeCode = fields[5];
+			if(typeCode.compare("homo") != 0 && typeCode.compare("het") != 0) {
 				cerr << "ERROR: unrecognized SNV type at line " << lineNum << " in file " << aberFile << endl;
 				cerr << line << endl;
 				exit(1);
 			}
-			for(m2_it = snvs.begin(); m2_it != snvs.end(); m2_it++) {
-				if((*m2_it).first.compare(chr) == 0) {
-					(*m2_it).second.push_back(snv);
-					break;
-				}
-			}
-			if(m2_it == snvs.end()) {
-				vector<SNV> temp;
-				temp.push_back(snv);
-				snvs.insert(make_pair(chr, temp));
-			}
+			varType type = (typeCode.compare("het") == 0)? het : homo;
+			SNV snv(pos, ref, alt, type);
+			snvs[chr].push_back(snv);
 			snvCount++;
 		}
 		//Insert
@@ -122,26 +116,17 @@ void Genome::loadAbers() {
 				exit(1);
 			}
 			string chr = abbrOfChr(fields[1]);
-			Insert insert;
-			insert.pos = atol(fields[2].c_str());// 1-based
-			insert.seq = fields[3];
-			insert.type = fields[4];
-			if(insert.type.compare("homo") != 0 && insert.type.compare("het") != 0) {
-				cerr << "ERROR: unrecognized Insert type at line " << lineNum << " in file " << aberFile << endl;
+			long pos = atol(fields[2].c_str());// 1-based
+			string seq = fields[3];
+			string typeCode = fields[4];
+			if(typeCode.compare("homo") != 0 && typeCode.compare("het") != 0) {
+				cerr << "ERROR: unrecognized insert type at line " << lineNum << " in file " << aberFile << endl;
 				cerr << line << endl;
 				exit(1);
 			}
-			for(m3_it = inserts.begin(); m3_it != inserts.end(); m3_it++) {
-				if((*m3_it).first.compare(chr) == 0) {
-					(*m3_it).second.push_back(insert);
-					break;
-				}
-			}
-			if(m3_it == inserts.end()) {
-				vector<Insert> temp;
-				temp.push_back(insert);
-				inserts.insert(make_pair(chr, temp));
-			}
+			varType type = (typeCode.compare("het") == 0)? het : homo;
+			Insert insert(pos, seq, type);
+			inserts[chr].push_back(insert);
 			insertCount++;
 		}
 		//Del
@@ -152,26 +137,17 @@ void Genome::loadAbers() {
 				exit(1);
 			}
 			string chr = abbrOfChr(fields[1]);
-			Del del;
-			del.pos = atol(fields[2].c_str());// 1-based
-			del.len = atoi(fields[3].c_str());
-			del.type = fields[4];
-			if(del.type.compare("homo") != 0 && del.type.compare("het") != 0) {
-				cerr << "ERROR: unrecognized del type at line " << lineNum << " in file " << aberFile << endl;
+			long pos = atol(fields[2].c_str());// 1-based
+			int length = atoi(fields[3].c_str());
+			string typeCode = fields[4];
+			if(typeCode.compare("homo") != 0 && typeCode.compare("het") != 0) {
+				cerr << "ERROR: unrecognized deletion type at line " << lineNum << " in file " << aberFile << endl;
 				cerr << line << endl;
 				exit(1);
 			}
-			for(m4_it = dels.begin(); m4_it != dels.end(); m4_it++) {
-				if((*m4_it).first.compare(chr) == 0) {
-					(*m4_it).second.push_back(del);
-					break;
-				}
-			}
-			if(m4_it == dels.end()) {
-				vector<Del> temp;
-				temp.push_back(del);
-				dels.insert(make_pair(chr, temp));
-			}
+			varType type = (typeCode.compare("het") == 0)? het : homo;
+			Deletion del(pos, length, type);
+			dels[chr].push_back(del);
 			delCount++;
 		}
 		else {
@@ -185,29 +161,23 @@ void Genome::loadAbers() {
 	cerr << "CNV: " << cnvCount << endl;
 	cerr << "SNV: " << snvCount << endl;
 	cerr << "Insert: " << insertCount << endl;
-	cerr << "Del: " << delCount << endl;
+	cerr << "Deletion: " << delCount << endl;
 }
 
-void Genome::loadSNPs(bool isvcf) {
+void Genome::loadSNPs() {
 	string snpFile = config.getStringPara("snp");
 	if(snpFile.empty()) {
 		return;
 	}
-	if(isvcf) {
-		sc.readSNPsFromVCF(snpFile);
-		cerr << "\n" << sc.SNPNumber() << " filtered germline SNPs were loaded from file " << snpFile << endl;
-	}
-	else {
-		sc.readSNPs(snpFile);
-		cerr << "\n" << sc.SNPNumber() << " SNPs to simulate were loaded from file " << snpFile << endl;
-	}
+	sc.readSNPs(snpFile);
+	cerr << "\n" << sc.SNPNumber() << " SNPs to simulate were loaded from file " << snpFile << endl;
 }
 
 void Genome::loadRefSeq() {
 	string refFile = config.getStringPara("ref");
 	string tmp = refFile;
 	if(tmp.empty()) {
-		cerr << "sequence file not specified!" << endl;
+		cerr << "reference sequence file not specified!" << endl;
 		exit(1);
 	}
 	if(strcmp(tmp.substr(tmp.length()-3).c_str(), ".gz") == 0) {
@@ -267,17 +237,7 @@ void Genome::loadTargets() {
 			tmp = atol(fields[2].c_str());
 		}
 		target.epos = min(chrLen, tmp+50); // 1-based
-		for(m_it = targets.begin(); m_it != targets.end(); m_it++) {
-			if((*m_it).first.compare(chr) == 0) {
-				(*m_it).second.push_back(target);
-				break;
-			}
-		}
-		if(m_it == targets.end()) {
-			vector<Target> temp;
-			temp.push_back(target);
-			targets.insert(make_pair(chr, temp));
-		}
+		targets[chr].push_back(target);
 		targetNum++;
 	}
 	ifs.close();
@@ -317,9 +277,19 @@ char* Genome::getSubSequence(string chr, int startPos, int length) {
 	return s;
 }
 
+char* Genome::getSubRefSequence(string chr, int startPos, int length) {
+	if(curChr.compare(chr) != 0) {
+		generateChrSequence(chr);
+	}
+	string seq = refSequence.substr(startPos, length);
+	char* s = new char[seq.length()+1];
+	strcpy(s, seq.c_str());
+	return s;
+}
+
 char* Genome::getSubAltSequence(string chr, int startPos, int length) {
 	if(curChr.compare(chr) != 0) {
-		generateAltSequence(chr);
+		generateChrSequence(chr);
 	}
 	//string seq = altSequence[chr].substr(startPos, length);
 	string seq = altSequence.substr(startPos, length);
@@ -328,7 +298,7 @@ char* Genome::getSubAltSequence(string chr, int startPos, int length) {
 	return s;
 }
 
-void Genome::generateAltSequence(string chr) {	
+void Genome::generateChrSequence(string chr) {	
 	int i, j;
 	vector<string>::iterator it = find(chromosomes.begin(), chromosomes.end(), chr);
 	if(it == chromosomes.end()) {
@@ -338,13 +308,21 @@ void Genome::generateAltSequence(string chr) {
 	}
 	
 	curChr = chr;
-	vector<SNP>& snpsOfChr = getSNPs(chr);
-	altSequence = fr.getSubSequence(chr, 0, getChromLen(chr));
-	for(j = 0; j < snpsOfChr.size(); j++) {
-		SNP snp = snpsOfChr[j];
-		long pos = snp.getPosition();
-		altSequence[pos-1] = snp.getNucleotide();
+	vector<SNV>& snvsOfChr = getRealSNVs(chr);
+	vector<Insert>& insertsOfChr = getRealInserts(chr);
+	vector<Deletion>& delsOfChr = getRealDels(chr);
+	
+	refSequence = fr.getSubSequence(chr, 0, getChromLen(chr));
+	altSequence = refSequence;
+	for(j = 0; j < snvsOfChr.size(); j++) {
+		SNV snv = snvsOfChr[j];
+		long pos = snv.getPosition();
+		altSequence[pos-1] = snv.getAlt();
+		if(snv.getType() == homo) {
+			refSequence[pos-1] = snv.getAlt();
+		}
 	}
+	transform(refSequence.begin(), refSequence.end(), refSequence.begin(), (int (*)(int))toupper);
 	transform(altSequence.begin(), altSequence.end(), altSequence.begin(), (int (*)(int))toupper);
 }
 
@@ -363,7 +341,7 @@ void Genome::saveSequence() {
 	
 	for(i = 0; i < chromosomes.size(); i++) {
 		string chr = chromosomes[i];
-		vector<CNV>& cnvsOfChr = getCNVs(chr);
+		vector<CNV>& cnvsOfChr = getSimuCNVs(chr);
 		long segStartPos = 1, segEndPos = -1;
 		
 		vector<string> chrSequences(ploidy, "");
@@ -417,10 +395,10 @@ void Genome::generateSegment(vector<string>& sequences, string chr, long segStar
 
 	transform(refSeq, refSeq+strlen(refSeq), refSeq, (int (*)(int))toupper);
 	
-	vector<SNP>& snpsOfChr = getSNPs(chr);
-	vector<SNV>& snvsOfChr = getSNVs(chr);
-	vector<Insert>& insertsOfChr = getInserts(chr);
-	vector<Del>& delsOfChr = getDels(chr);
+	vector<SNP>& snpsOfChr = getSimuSNPs(chr);
+	vector<SNV>& snvsOfChr = getSimuSNVs(chr);
+	vector<Insert>& insertsOfChr = getSimuInserts(chr);
+	vector<Deletion>& delsOfChr = getSimuDels(chr);
 	
 	int i, j, k, n;
 	int ploidy = config.getIntPara("ploidy");
@@ -538,14 +516,17 @@ void Genome::generateSegment(vector<string>& sequences, string chr, long segStar
 	k = 0;
 	for(i = 0; i < snvsOfChr.size(); i++) {
 		SNV snv = snvsOfChr[i];
-		if(snv.pos >= segStartPos && snv.pos <= segEndPos) {
-			int sindx = snv.pos-segStartPos;
-			if(snv.type.compare("homo") == 0) {
+		long pos = snv.getPosition();
+		if(pos >= segStartPos && pos <= segEndPos) {
+			int sindx = pos-segStartPos;
+			varType type = snv.getType();
+			char alt = snv.getAlt();
+			if(type == homo) {
 				for(j = 0; j < ploidy; j++) {
 					string& segSeq = segSeqs[j];
 					unsigned int segLen = segSeq.length();
 					for(int t = 0; t < segLen/refSize; t++) {
-						segSeq[sindx+t*refSize] = snv.alt;
+						segSeq[sindx+t*refSize] = alt;
 					}
 				}
 			}
@@ -558,7 +539,7 @@ void Genome::generateSegment(vector<string>& sequences, string chr, long segStar
 					string& segSeq = segSeqs[j];
 					unsigned int segLen = segSeq.length();
 					for(int t = 0; t < segLen/refSize; t++) {
-						segSeq[sindx+t*refSize] = snv.alt;
+						segSeq[sindx+t*refSize] = alt;
 					}
 				}
 				k = (k+1)%2;
@@ -574,9 +555,12 @@ void Genome::generateSegment(vector<string>& sequences, string chr, long segStar
 	k = 0;
 	for(i = 0; i < insertsOfChr.size(); i++) {
 		Insert insert = insertsOfChr[i];
-		if(insert.pos >= segStartPos && insert.pos <= segEndPos) {
-			int sindx = insert.pos-segStartPos;
-			if(insert.type.compare("homo") == 0) {
+		long pos = insert.getPosition();
+		if(pos >= segStartPos && pos <= segEndPos) {
+			int sindx = pos-segStartPos;
+			varType type = insert.getType();
+			string seq = insert.getSequence();
+			if(type == homo) {
 				for(j = 0; j < ploidy; j++) {
 					int offset = 0;
 					map<int, int>& insertedSeq = insertsPerhaploidy[j];
@@ -587,12 +571,12 @@ void Genome::generateSegment(vector<string>& sequences, string chr, long segStar
 					}
 					string& segSeq = segSeqs[j];
 					n = segSeq.length()/(refSize+insertLens[j]);
-					int len = insert.seq.length();
+					int len = seq.length();
 					for(int t = 0; t < n; t++) {
-						segSeq.insert(sindx+offset+t*(refSize+insertLens[j]+len), insert.seq);
+						segSeq.insert(sindx+offset+t*(refSize+insertLens[j]+len), seq);
 					}
-					insertLens[j] += insert.seq.length();
-					insertedSeq.insert(make_pair(sindx, insert.seq.length()));
+					insertLens[j] += seq.length();
+					insertedSeq.insert(make_pair(sindx, seq.length()));
 				}
 			}
 			else {
@@ -610,12 +594,12 @@ void Genome::generateSegment(vector<string>& sequences, string chr, long segStar
 					}
 					string& segSeq = segSeqs[j];
 					n = segSeq.length()/(refSize+insertLens[j]);
-					int len = insert.seq.length();
+					int len = seq.length();
 					for(int t = 0; t < n; t++) {
-						segSeq.insert(sindx+offset+t*(refSize+insertLens[j]+len), insert.seq);
+						segSeq.insert(sindx+offset+t*(refSize+insertLens[j]+len), seq);
 					}
-					insertLens[j] += insert.seq.length();
-					insertedSeq.insert(make_pair(sindx, insert.seq.length()));
+					insertLens[j] += seq.length();
+					insertedSeq.insert(make_pair(sindx, seq.length()));
 				}
 				k = (k+1)%2;
 			}
@@ -627,10 +611,13 @@ void Genome::generateSegment(vector<string>& sequences, string chr, long segStar
 	int* delLens = new int[ploidy];
 	memset(delLens, 0, ploidy*sizeof(int));
 	for(i = 0; i < delsOfChr.size(); i++) {
-		Del del = delsOfChr[i];
-		if(del.pos >= segStartPos && del.pos <= segEndPos) {
-			int sindx = del.pos-segStartPos;
-			if(del.type.compare("homo") == 0) {
+		Deletion del = delsOfChr[i];
+		long pos = del.getPosition();
+		if(pos >= segStartPos && pos <= segEndPos) {
+			int sindx = pos-segStartPos;
+			varType type = del.getType();
+			int delLen = del.getLength();
+			if(type == homo) {
 				for(j = 0; j < ploidy; j++) {
 					int offset = 0;
 					map<int, int>& insertedSeq = insertsPerhaploidy[j];
@@ -651,10 +638,10 @@ void Genome::generateSegment(vector<string>& sequences, string chr, long segStar
 					string& segSeq = segSeqs[j];
 					n = segSeq.length()/(refSize+insertLens[j]-delLens[j]);
 					for(int t = 0; t < n; t++) {
-						segSeq.erase(sindx+offset+t*(refSize+insertLens[j]-delLens[j]-del.len), del.len);
+						segSeq.erase(sindx+offset+t*(refSize+insertLens[j]-delLens[j]-delLen), delLen);
 					}
-					delLens[j] += del.len;
-					delSeq.insert(make_pair(sindx, del.len));
+					delLens[j] += delLen;
+					delSeq.insert(make_pair(sindx, delLen));
 				}
 			}
 			else {
@@ -682,15 +669,17 @@ void Genome::generateSegment(vector<string>& sequences, string chr, long segStar
 					string& segSeq = segSeqs[j];
 					n = segSeq.length()/(refSize+insertLens[j]-delLens[j]);
 					for(int t = 0; t < n; t++) {
-						segSeq.erase(sindx+offset+t*(refSize+insertLens[j]-delLens[j]-del.len), del.len);
+						segSeq.erase(sindx+offset+t*(refSize+insertLens[j]-delLens[j]-delLen), delLen);
 					}
-					delLens[j] += del.len;
-					delSeq.insert(make_pair(sindx, del.len));
+					delLens[j] += delLen;
+					delSeq.insert(make_pair(sindx, delLen));
 				}
 				k = (k+1)%2;
 			}
 		}
 	}
+	delete[] insertLens;
+	delete[] delLens;
 	
 	for(i = 0; i < ploidy; i++) {
 		if(segSeqs[i].length() > 0) {
@@ -773,31 +762,19 @@ void Genome::splitToFrags(vector<Fragment>& fragments) {
 			if(fragStartPos+fragLen-1 > chrLen) {
 				break;
 			}
-			Fragment frag(chr, fragStartPos, fragLen, 1);
-			fragments.push_back(frag);
+			Fragment frag1(chr, fragStartPos, fragLen, 1);
+			fragments.push_back(frag1);
+			//complementary strand
+			Fragment frag2(chr, fragStartPos, fragLen, -1);
+			fragments.push_back(frag2);
 			fragStartPos += fragLen;
 		}
 		if(fragStartPos <= chrLen) {
-			Fragment frag(chr, fragStartPos, chrLen-fragStartPos+1, 1);
-			fragments.push_back(frag);
-		}
-		//complementary strand
-		
-		fragStartPos = 1;
-		while(fragStartPos <= chrLen) {
-			fragLen = randomInteger(Fragment::minSize, Fragment::maxSize+1);
-			if(fragStartPos+fragLen-1 > chrLen) {
-				break;
-			}
-			Fragment frag(chr, fragStartPos, fragLen, -1);
-			fragments.push_back(frag);
-			fragStartPos += fragLen;
-		}
-		if(fragStartPos <= chrLen) {
-			Fragment frag(chr, fragStartPos, chrLen-fragStartPos+1, -1);
-			fragments.push_back(frag);
-		}
-		
+			Fragment frag1(chr, fragStartPos, chrLen-fragStartPos+1, 1);
+			fragments.push_back(frag1);
+			Fragment frag2(chr, fragStartPos, chrLen-fragStartPos+1, 1);
+			fragments.push_back(frag2);
+		}	
 	}
 	for(i = 0; i < fragments.size(); i++) {
 		fragments[i].createSequence();

@@ -46,12 +46,12 @@ void Fragment::createSequence() {
 		sequence = getComplementSeq(sequence);
 	}
 	gcContent = countGC(sequence);
+	
 }
 
 void Fragment::amplify(AmpliconLink& results) {
 	unsigned int i, j, k, n;
 	unsigned int spos, ampliconLen, curSize;
-	double ador = config.getRealPara("ador");
 	double ber = config.getRealPara("ber");
 	
 	string bases = config.getStringPara("bases");
@@ -102,20 +102,9 @@ void Fragment::amplify(AmpliconLink& results) {
 		fragSeq_c[spos+ampliconLen] = c;	
 		
 		vector<AmpError> errs;
-		k = 0;
 		for(j = 8; j < ampliconLen; j++) {
 			double p = threadPool->randomDouble(0, 1);
-			if(p <= ador) {
-				AmpError ampErr(0, j, 0);
-				errs.push_back(ampErr);
-				k++;
-				if(fragSeq_c[spos+j] == 'C' || fragSeq_c[spos+j] == 'G') {
-					gcNum--;
-				}
-				continue;
-			}
-			p = threadPool->randomDouble(0, 1);
-			if(p <= ber) {
+			if(p < ber) {
 				char base = fragSeq_c[spos+j];
 				do {
 					n = threadPool->randomInteger(0, bases.size());
@@ -132,7 +121,6 @@ void Fragment::amplify(AmpliconLink& results) {
 				errs.push_back(ampErr);
 			}
 		}
-		
 		AmpError *ampErrs = NULL;
 		if(!errs.empty()) {
 			ampErrs = new AmpError[errs.size()+1];
@@ -141,7 +129,7 @@ void Fragment::amplify(AmpliconLink& results) {
 			}
 			ampErrs[j].setAlt(bases.size());
 		}
-		Amplicon tmp(true, this, ampErrs, spos, ampliconLen-k, max(0, gcNum));
+		Amplicon tmp(true, this, ampErrs, spos, ampliconLen, max(0, gcNum));
 		insertLinkList(results, tmp);
 	}
 	delete[] fragSeq_c;

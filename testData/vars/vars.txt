@@ -1,0 +1,29 @@
+i	chr20	4500100	tcgagtcg	homo
+i	chr20	11000100	tcgagtc	homo
+i	chr20	12000100	tcgagt	het
+i	chr20	44000100	tcgagtcg	het
+i	chr20	57000100	tcgagtc	homo
+i	chr20	61000100	tcgagt	het
+d	chr20	3000100	10	homo
+d	chr20	5000100	9	het
+d	chr20	9500100	8	homo
+d	chr20	48000100	8	het
+d	chr20	58000100	7	homo
+d	chr20	62000100	6	het
+s	chr20	2000100	a	T	homo
+s	chr20	4000100	T	G	homo
+s	chr20	8500100	A	G	het
+s	chr20	9000100	G	C	homo
+s	chr20	11500100	G	C	homo
+s	chr20	46000100	c	T	het
+s	chr20	51000100	g	A	het
+s	chr20	53000100	C	G	het
+s	chr20	55000100	C	T	homo
+s	chr20	56000100	A	T	homo
+s	chr20	59000100	A	T	homo
+c	chr20	5000000	6000000	1	1
+c	chr20	10000000	14500000	3	2
+c	chr20	37500000	40000000	4	3
+c	chr20	40000000	43500000	1	1
+c	chr20	44000000	47000000	2	2
+c	chr20	49000000	53000000	1	1

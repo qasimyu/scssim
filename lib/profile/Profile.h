@@ -27,7 +27,15 @@ class Profile {
 		int minBaseQuality;
 		int maxBaseQuality;
 		
-		double indelRate;
+		//double indelRate;
+		
+		double insertRate;
+		Matrix<double> insFreqs;
+		Matrix<double> insCdf;
+		double delRate;
+		Matrix<double> delFreqs;
+		Matrix<double> delCdf;
+		double baseCount;
 		
 		char **kmers;
 		KmerIndex rIndex;
@@ -55,18 +63,18 @@ class Profile {
 		//GC-content bias
 		double gcMeans[101];
 		double gcStd;
-		vector<mt19937> gc_generators;
+		vector<default_random_engine> gc_generators;
 		vector<normal_distribution<double> > gc_normDists;
 		
 		vector<double> gcs;
 		vector<double> readCounts;
 		
 		void initKmers();
+		void setReadLength();
 		int getKmerIndx(const char *s);
-		void setBins();
 		
 		void initGCParas();
-		void estimateGCParas(string outFile);
+		void estimateGCParas();
 		int countGC(string chr, long position);
 		
 		void saveResults();
@@ -74,7 +82,9 @@ class Profile {
 		
 		void initCDFs();
 		void normParas(bool isLoaded);
-		
+
+		int getInsertLen();
+		int getDelLen();
 		int getSubBaseIndx1(char *kmer, int binIndx);
 		int getSubBaseIndx2(char *kmer, int binIndx);
 		int getIndelSeq(vector<int> &baseIndxs);

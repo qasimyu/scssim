@@ -21,7 +21,7 @@ void ThreadPool::pool_init() {
 	max_thread_num = min(max_thread_num, thread_num);
 
 	cerr << "\nnumber of available threads: " << thread_num << endl;
-	cerr << "number of used threads: " << max_thread_num << endl << endl;
+	cerr << "number of requested threads: " << max_thread_num << endl << endl;
 
 	for(size_t i = 0; i < max_thread_num; i++) {
 		Thread* thread = new Thread();

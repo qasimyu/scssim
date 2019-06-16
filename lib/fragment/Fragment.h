@@ -25,7 +25,7 @@ class Fragment {
 		int gcContent;
 		int primerNum;
 		
-		char *sequence;
+		char* sequence;
 		
 	public:	
 		static int minSize, maxSize;
@@ -47,6 +47,7 @@ class Fragment {
 		void describe();
 		
 		void setPrimers(int primers) {primerNum = primers;}
+		int getPrimers() {return primerNum;}
 		
 		void createSequence();
 		char* getSequence() {return sequence;}
