@@ -56,7 +56,7 @@ The “scssim genreads” subcommand is developed to simulate single-end or pair
 Example:
 
 ```
-scssim genreads -i ./results/simu.fa -m ./testData/models/Illumina_HiSeq2500.profile -t 5 -o ./results/reads
+scssim genreads -i ./results/simu.fa -r 2e-10 -m ./testData/models/Illumina_HiSeq2500.profile -t 5 -o ./results/reads
 ```
 
 ## Citation
