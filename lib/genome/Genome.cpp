@@ -21,7 +21,7 @@ void Genome::loadData() {
 	loadRefSeq();
 	loadTargets(); // WES is currently not supported
 	
-	curChr = "nodefined";
+	curChr = "NA";
 }
 
 void Genome::loadTrainData() {
@@ -29,7 +29,7 @@ void Genome::loadTrainData() {
 	vcfParser.parse();
 	loadRefSeq();
 	loadTargets();
-	curChr = "nodefined";
+	curChr = "NA";
 }
 
 void Genome::loadAbers() {

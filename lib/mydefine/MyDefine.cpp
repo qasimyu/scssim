@@ -65,6 +65,20 @@ double stupdf(double x, double mu, double nu, double sigma) {
 	return ret;
 }
 
+//****** random number from poisson distribution ******//
+long poissRand(double lambda)
+{
+	long x = -1;
+	double u;
+	double log1 = 0, log2 = -lambda;
+	do {
+		u = randomDouble(0, 1);
+		log1 += log(u);
+		x++;
+	} while(log1 >= log2);
+	return x;
+}
+
 //****** produce a matrix containing random intergers according to the probability distribution ******//
 Matrix<int> randsrc(int m, int n, Matrix<int> alphabet, Matrix<double> aprob, bool iscdf) {
 	Matrix<int> ret;
@@ -174,7 +188,90 @@ int randIndx(Matrix<double>& aprob, bool iscdf) {
 	return ac-1;
 }
 
-int randIndx(double *cdf, int ac) {
+void* batchSampling(const void* args) {
+	double* paras = (double*) args;
+	unsigned int i, j;
+	unsigned int num_samples = paras[0];
+	unsigned int ac = paras[1];
+	
+	for(i = 0; i < num_samples; i++) {
+		j = randIndx(&paras[ac+2], ac);
+		paras[j+2]++;
+	}
+}
+
+unsigned int* randIndx_hp(Matrix<double>& prob, unsigned long n, unsigned int* ret, bool addto) {
+	unsigned int i, j = 0, ac = prob.getCOLS();
+	double* p = prob.getEntrance();
+	unsigned int loadPerThread = max((unsigned int) 1, min((unsigned int) 1000, ac/threadPool->getThreadNumber()));
+	unsigned int sindx = 0, eindx;
+	unsigned long count = 0;
+	vector<double*> threadParas;
+	vector<double> totalProbs;
+	while(sindx < ac) {
+		if(sindx+loadPerThread > ac) {
+			eindx = ac-1;
+		}
+		else {
+			eindx = sindx+loadPerThread-1;
+		}
+		double* paras = new double[(eindx-sindx+1)*2+2];
+		memset(&paras[2], 0, sizeof(double)*(eindx-sindx+1));
+		double totalProb = 0;
+		for(i = sindx; i <= eindx; i++) {
+			totalProb += p[i];
+		}
+		for(i = sindx; i <= eindx; i++) {
+			paras[i-sindx+eindx-sindx+3] = paras[i-sindx+eindx-sindx+2] + p[i]/totalProb;
+		}
+		paras[0] = (unsigned int) (totalProb*n);
+		paras[1] = eindx-sindx+1;
+		count += paras[0];
+		totalProbs.push_back(totalProb);
+		threadParas.push_back(paras);
+		sindx += loadPerThread;
+	}
+	n -= count;
+	if(n > 0) {
+		unsigned int m = totalProbs.size();
+		double* probs = new double[m];
+		probs[0] = totalProbs[0];
+		for(i = 1; i < m; i++) {
+			probs[i] = probs[i-1]+totalProbs[i];
+		}
+		while(n-- > 0) {
+			j = randIndx(probs, m);
+			threadParas[j][0] += 1;
+		}
+		delete[] probs;	
+	}
+	totalProbs.clear();
+	
+	for(i = 0; i < threadParas.size(); i++) {
+		threadPool->pool_add_work(&batchSampling, threadParas[i], i);
+	}
+	threadPool->wait();
+	
+	sindx = 0;
+	for(i = 0; i < threadParas.size(); i++) {
+		double* paras = threadParas[i];
+		eindx = sindx+paras[1]-1;
+		j = 2;
+		if(addto) {
+			while(sindx <= eindx) {
+				ret[sindx++] += paras[j++];
+			}
+		}
+		else {
+			while(sindx <= eindx) {
+				ret[sindx++] = paras[j++];
+			}
+		}
+		delete[] paras;
+	}
+}
+
+unsigned int randIndx(double *cdf, unsigned int ac) {
 	double r = threadPool->randomDouble(ZERO_FINAL, 1);
 	for(size_t k = 0; k < ac; k++) {
 		if(r <= cdf[k]) {

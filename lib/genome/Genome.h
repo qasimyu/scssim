@@ -54,7 +54,7 @@ class Genome {
 		map<string, vector<Target> > targets;
 		
 		SNPOnChr sc;
-		VcfParser vcfParser;		
+		VcfParser vcfParser;
 		FastaReference fr;
 		
 		//map<string, string> altSequence;

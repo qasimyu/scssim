@@ -148,16 +148,35 @@ unsigned long Malbac::getAmpliconCount(AmpliconLink linkList) {
 	return linkList->link->amplicon.getData();
 }
 
+void Malbac::calGCOfRef() {
+	unsigned int i, n = fragments.size();
+	unsigned long gcCount = 0, refLen = 0;
+	for(i = 0; i < n; i++) {
+		char* seq = fragments[i].getSequence();
+		gcCount += fragments[i].getGCcontent();;
+		refLen += fragments[i].getLength();
+	}
+	refGCcontent = 1.0*gcCount/refLen;
+}
+
+void Malbac::calGCOfProducts() {
+	unsigned long gcCount = 0, totalCount = 0;
+	AmpliconLink p = fullAmplicons->link->link;
+	while(p != fullAmplicons->link) {
+		gcCount += p->amplicon.getGCcontent();
+		totalCount += p->amplicon.getLength();
+		p = p->link;
+	}
+	cerr << "GCcontent after amp: " << 1.0*gcCount/totalCount << endl;
+}
+
 void Malbac::amplify() {
 	cerr << "\nMALBAC amplification..." << endl;
 	
 	double gamma = config.getRealPara("gamma");
-	if(gamma <= 0 || gamma > 0.001) {
-		unsigned long refLen = genome.getGenomeLength()/2;
-		gamma = 3.0e-7*refLen/1000000;
-		config.setRealPara("gamma", gamma);
-		cerr << "the value of parameter \"gamma\" was set to " << gamma << endl;
-	}
+	
+	//calGCOfRef();
+	//cerr << "GCcontent before amp: " << refGCcontent << endl;
 	
 	createPrimers();
 	setPrimers(true);
@@ -178,6 +197,7 @@ void Malbac::amplify() {
 			cerr << "fragment amplification done!" << endl;
 		}
 	}
+	//calGCOfProducts();
 }
 
 void Malbac::amplifyAndSaveProducts() {
@@ -192,7 +212,6 @@ void Malbac::amplifyAndSaveProducts() {
 	cerr << "\nMALBAC amplification..." << endl;
 	createPrimers();
 	setPrimers(true);
-	cerr << "amplifyFrags" << endl;
 	amplifyFrags();
 	for(int i = 0; i < 5; i++) {
 		if(totalPrimers == 0) {
@@ -201,12 +220,12 @@ void Malbac::amplifyAndSaveProducts() {
 		cerr << "cycle number: " << i+1 << endl;
 		setPrimers(false);
 		amplifySemiAmplicons();
-		cerr << getAmpliconCount(fullAmplicons) << endl;
+		//cerr << getAmpliconCount(fullAmplicons) << endl;
 		cerr << "semi amplicon amplification done!" << endl;
 		saveFullAmplicons(ofs);
 		if(i < 4) {
 			amplifyFrags();
-			cerr << getAmpliconCount(semiAmplicons) << endl;
+			//cerr << getAmpliconCount(semiAmplicons) << endl;
 			cerr << "fragment amplification done!" << endl;
 		}
 	}
@@ -217,8 +236,8 @@ void Malbac::amplifyAndSaveProducts() {
 void Malbac::setPrimers(bool onlyFrags) {
 	unsigned long i, j, k;
 	unsigned long templateNum = 0, fragNum = fragments.size();
-	unsigned int length, gcContent;
-	double totalLen = 0;
+	unsigned int length;
+	double totalLen = 0, lambda;
 	
 	for(i = 0; i < fragNum; i++) {
 		length = fragments[i].getLength();
@@ -230,55 +249,37 @@ void Malbac::setPrimers(bool onlyFrags) {
 		AmpliconLink p = semiAmplicons->link->link;
 		templateNum += getAmpliconCount(semiAmplicons);
 		while(p != semiAmplicons->link) {
-			Amplicon& amplicon = p->amplicon; 
-			length = amplicon.getLength();
-			totalLen += length;
+			Amplicon& amplicon = p->amplicon;
+			totalLen += amplicon.getLength();
 			p = p->link;
 		}
 	}
 	
+	double aveLen = totalLen/templateNum;
 	double gamma = config.getRealPara("gamma");
-	unsigned long usedPrimers = totalPrimers*gamma;
+	unsigned long expectedPrimers = totalPrimers*gamma*templateNum;
 	unsigned long count = 0;
 	for(i = 0; i < fragNum; i++) {
 		length = fragments[i].getLength();
-		k = 1.0*length/totalLen*usedPrimers;
-		fragments[i].setPrimers(k);
+		lambda = expectedPrimers*(1.0*length/totalLen);
+		k = poissRand(lambda);
 		count += k;
+		fragments[i].setPrimers(k);
 	}
 	if(!onlyFrags) {
 		AmpliconLink p = semiAmplicons->link->link;
 		while(p != semiAmplicons->link) {
 			Amplicon& amplicon = p->amplicon;
 			length = amplicon.getLength();
-			k = 1.0*length/totalLen*usedPrimers;
-			amplicon.setPrimers(k);
+			lambda = expectedPrimers*(1.0*length/totalLen);
+			k = poissRand(lambda);
 			count += k;
+			amplicon.setPrimers(k);
 			p = p->link;
 		}
 	}
-	long n = usedPrimers-count;
-	while(n > 0) {
-		j = threadPool->randomInteger(0, 50);
-		if(j > n) j = n;
-		i = threadPool->randomInteger(0, templateNum);
-		if(i < fragNum) {
-			fragments[i].setPrimers(fragments[i].getPrimers()+j);
-		}
-		else {
-			i -= fragNum;
-			AmpliconLink p = semiAmplicons->link;
-			k = 0;
-			while(k <= i) {
-				p = p->link;
-				k++;
-			}
-			Amplicon& amplicon = p->amplicon;
-			amplicon.setPrimers(amplicon.getPrimers()+j);
-		}
-		n -= j;
-	}
-	totalPrimers -= usedPrimers;
+	
+	totalPrimers -= count;
 }
 
 void Malbac::saveFullAmplicons(ofstream& ofs) {
@@ -367,47 +368,49 @@ void Malbac::amplifySemiAmplicons() {
 }
 
 void Malbac::setReadCounts(long reads) {
-	int k = config.isPairedEnd()? 2:1;
+	if(readNumbers != NULL) {
+		delete[] readNumbers;
+	}
 	unsigned long i;
 	unsigned long ampliconNum = getAmpliconCount(fullAmplicons);
-	double WL = 0;
 	Matrix<double> wls(1, ampliconNum);
 	AmpliconLink p = fullAmplicons->link->link;
 	i = 0;
 	while(p != fullAmplicons->link) {
 		double wl = p->amplicon.getWeightedLength();
-		WL += wl;
 		wls.set(0, i++, wl);
 		p = p->link;
 	}
+	wls.normalize(0);
 	
-	readNumbers = new int[ampliconNum];
-	memset(readNumbers, 0, sizeof(int)*ampliconNum);
-	long sum = 0;
+	readNumbers = new unsigned int[ampliconNum];
+	//memset(readNumbers, 0, sizeof(int)*ampliconNum);
+	unsigned long sum = 0;
 	for(i = 0; i < ampliconNum; i++) {
-		int readCount = (wls.get(0,i)/WL)*reads;
-		readCount -= readCount%k;
+		unsigned int readCount = wls.get(0,i)*reads;
 		readNumbers[i] = readCount;
 		sum += readCount;
 	}
 	
-	//wls.normalize(0);
-	//Matrix<double> aprob = wls.cumsum();
-	wls.clear();
-	
 	reads -= sum;
-	while(reads > 0) {
-		i = threadPool->randomInteger(0, ampliconNum);
-		//i = randIndx(aprob, true);
-		readNumbers[i] += k;
-		reads -= k;
+	randIndx_hp(wls, reads, readNumbers, true);
+	
+	int k = 1;
+	bool paired = config.isPairedEnd();
+	if(paired) {
+		for(i = 0; i < ampliconNum; i++) {
+			if(readNumbers[i]%2 == 1) {
+				readNumbers[i] += k;
+				k *= -1;
+			}
+		}
 	}
 }
 
 void Malbac::yieldReads() {	
 	int i, j = 0;	
 	unsigned long refLen = genome.getGenomeLength()/2;
-	unsigned long reads = refLen*config.getIntPara("coverage")/config.getIntPara("readLength");
+	unsigned long reads = refLen*config.getRealPara("coverage")/config.getIntPara("readLength");
 	if(config.isVerbose()) {	
 		cerr << "\nNumber of reads to generate: " << reads << endl;
 	}

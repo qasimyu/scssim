@@ -11,7 +11,7 @@
 #include "Config.h"
 
 Config::Config() {
-	string strParaNames[] = {"bam", "profile", "ref", "target", "var", "snp",
+	string strParaNames[] = {"bam", "profile", "ref", "target", "var", "snp", 
 							"vcf", "samtools", "bases", "output", "layout"};
 	
 	/*---start default configuration---*/
@@ -32,7 +32,6 @@ Config::Config() {
 	intParas.insert(make_pair("threads", 1));
 	intParas.insert(make_pair("verbose", 1));
 	intParas.insert(make_pair("readLength", 0));
-	intParas.insert(make_pair("coverage", 0));
 	intParas.insert(make_pair("ploidy", 2));
 	intParas.insert(make_pair("isize", 260));
 	intParas.insert(make_pair("kmer", 3));
@@ -41,6 +40,7 @@ Config::Config() {
 	intParas.insert(make_pair("ampliconMinLen", 1000));
 	intParas.insert(make_pair("fragSize", 1000));
 	
+	realParas.insert(make_pair("coverage", 0));
 	realParas.insert(make_pair("indelRate", 0.00025));
 	realParas.insert(make_pair("gamma", -1));
 	realParas.insert(make_pair("ber", 3.4e-4));

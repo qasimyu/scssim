@@ -190,11 +190,17 @@ numtype prctile(vector<numtype> &x, double perc) {
 	return ret;
 }
 
+long poissRand(double lambda);
 int randsrc(Matrix<int>& alphabet, Matrix<double>& aprob, bool iscdf);
 Matrix<int> randsrc(int m, int n, Matrix<int> alphabet, Matrix<double> aprob, bool iscdf);
+
 int randIndx(Matrix<double>& aprob, bool iscdf);
-int randIndx(double *cdf, int ac);
 Matrix<int> randIndx(int m, int n, Matrix<double> aprob, bool iscdf);
+
+unsigned int randIndx(double *cdf, unsigned int ac);
+void* batchSampling(const void* args);
+unsigned int* randIndx_hp(Matrix<double>& prob, unsigned long n, unsigned int* ret, bool addto);
+
 double randomDouble(double start, double end);
 long randomInteger(long start, long end);
 

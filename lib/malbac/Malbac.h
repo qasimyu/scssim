@@ -25,6 +25,7 @@ class PrimerIndex {
 
 class Malbac {
 	private:
+		double refGCcontent;
 		unsigned long totalPrimers;
 		char **primers;
 		int ptypeCount;
@@ -35,11 +36,14 @@ class Malbac {
 		//vector<Amplicon> fullAmplicons;
 		AmpliconLink semiAmplicons;
 		AmpliconLink fullAmplicons;
-		int* readNumbers;
+		unsigned int* readNumbers;
 		
 		mutable pthread_mutex_t pm_amp, pm_primer;
 		
 		void createPrimers();
+		
+		void calGCOfRef();
+		void calGCOfProducts();
 		
 		void amplifyFrags();
 		void amplifySemiAmplicons();
@@ -65,7 +69,7 @@ class Malbac {
 		AmpliconLink getFullAmplicons() {return fullAmplicons;}
 		unsigned long getAmpliconCount(AmpliconLink linkList);
 		
-		int* getReadNumbers() {return readNumbers;}
+		unsigned int* getReadNumbers() {return readNumbers;}
 		
 		void extendSemiAmplicons(AmpliconLink amplicons);
 		void extendFullAmplicons(AmpliconLink amplicons);

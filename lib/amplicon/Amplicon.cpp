@@ -253,9 +253,11 @@ void* Amplicon::batchAmplify(const void* args) {
 }
 
 char* Amplicon::getSequence() {
+	/*
 	if(sequence != NULL) {
 		return sequence;
 	}
+	*/
 	unsigned int i, j, k;
 	unsigned int n, m, sindx;
 	unsigned int semiLength, length;
@@ -402,8 +404,7 @@ void* Amplicon::yieldReads(const void* args) {
 	AmpliconLink p = pNodeRange[0];
 	AmpliconLink fullAmplicons = malbac.getFullAmplicons();
 	int j, k, n, fragCount, failCount, seqLen;
-	AmpliconLink amplicons = malbac.getFullAmplicons();
-	int* readNumbers = malbac.getReadNumbers();
+	unsigned int* readNumbers = malbac.getReadNumbers();
 	
 	char *seq, *ampliconSeq, *fragSeq;
 	bool paired = config.isPairedEnd();
@@ -437,10 +438,10 @@ void* Amplicon::yieldReads(const void* args) {
 			continue;
 		}
 		ampliconSeq = p->amplicon.getSequence();
-		p = p->link;
 		ampliconLen = strlen(ampliconSeq);
 		if(ampliconLen < readLength) {
 			delete[] ampliconSeq;
+			p = p->link;
 			continue;
 		}
 		
@@ -543,6 +544,7 @@ void* Amplicon::yieldReads(const void* args) {
 			}
 		}
 		delete[] ampliconSeq;
+		p = p->link;	
 	}
 	
 	if(paired) {
