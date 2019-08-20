@@ -51,12 +51,12 @@ scssim learn -b <sample>.bam -v <sample>.vcf -r <reference>.fa -o <sample>.profi
 
 ### Step 3: amplify single cell genome and generate reads
 
-The “scsim genreads” subcommand is developed to simulate single-end or paired-end reads based on the results of “simuVars” and “learnProfile” modules. 
+The “scssim genreads” subcommand is developed to simulate single-end or paired-end reads based on the results of “simuVars” and “learnProfile” modules. 
 
 Example:
 
 ```
-scsim genreads -i ./results/simu.fa -m ./testData/models/Illumina_HiSeq2500.profile -t 5 -o ./results/reads
+scssim genreads -i ./results/simu.fa -m ./testData/models/Illumina_HiSeq2500.profile -t 5 -o ./results/reads
 ```
 
 ## Citation
