@@ -67,7 +67,7 @@ Please cite SCSsim in your publications if it helps your research:
 @incollection{yu2019scssim,
   author = {Zhenhua Yu, Fang Du, Xuehong Sun, Ao Li},
   title = {SCSsim: an integrated tool for simulating single-cell genome sequencing data},
-  year = {2019, under review},
+  year = {2019, Bioinformatics},
 }
 ```
 
