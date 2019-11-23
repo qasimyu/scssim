@@ -64,10 +64,11 @@ scssim genreads -i ./results/simu.fa -r 2e-10 -m ./testData/models/Illumina_HiSe
 Please cite SCSsim in your publications if it helps your research:
 
 ``` bibtex
-@incollection{yu2019scssim,
-  author = {Zhenhua Yu, Fang Du, Xuehong Sun, Ao Li},
-  title = {SCSsim: an integrated tool for simulating single-cell genome sequencing data},
-  year = {2019, Bioinformatics},
+@article{yu2019scssim,
+  title={SCSsim: an integrated tool for simulating single-cell genome sequencing data},
+  author={Yu, Zhenhua and Du, Fang and Sun, Xuehong and Li, Ao},
+  journal={Bioinformatics},
+  year={2019}
 }
 ```
 
