@@ -364,8 +364,8 @@ void Genome::saveSequence() {
 		
 		for(j = 0; j < ploidy; j++) {
 			stringstream ss;
-			ss << j+1; 
-			ofs << ">" << chr << "_" << ss.str() << endl;
+			ss << j+1;
+			ofs << ">" << chr << "_" << ss.str() << "_" << getChromLen(chr) << endl;
 			unsigned int sindx = 0;
 			unsigned int length = chrSequences[j].length();
 			int width = 100;

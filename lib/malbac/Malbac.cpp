@@ -409,7 +409,14 @@ void Malbac::setReadCounts(long reads) {
 
 void Malbac::yieldReads() {	
 	int i, j = 0;	
-	unsigned long refLen = genome.getGenomeLength()/2;
+	//unsigned long refLen = genome.getGenomeLength()/2;
+	vector<string>& chrs = genome.getChroms();
+	unsigned long refLen = 0;
+	for(i = 0; i < chrs.size(); i++) {
+		vector<string> fields = split(chrs[i], '_');
+		refLen += atoi(fields[fields.size()-1].c_str());
+	}
+	refLen /= 2;
 	unsigned long reads = refLen*config.getRealPara("coverage")/config.getIntPara("readLength");
 	if(config.isVerbose()) {	
 		cerr << "\nNumber of reads to generate: " << reads << endl;
